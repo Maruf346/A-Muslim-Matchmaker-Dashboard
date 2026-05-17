@@ -16,6 +16,7 @@ import {
   MessageCircle,
   CreditCard
 } from "lucide-react";
+import { span } from "motion/react-m";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -26,7 +27,7 @@ const navItems = [
   { path: "/leads", label: "Leads", icon: Layers },
   { path: "/chat", label: "Chat with User", icon: MessageCircle },
   { path: "/subscriptions", label: "Subscriptions & Payments", icon: CreditCard },
-  { path: "/custom-fields", label: "Custom Fields", icon: FileText },
+  // { path: "/custom-fields", label: "Custom Fields", icon: FileText },
   { path: "/reports", label: "Reports", icon: BarChart3 },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
@@ -59,11 +60,18 @@ export function RootLayout() {
   return (
     <div className="flex h-screen bg-[#FFFFFF]">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-64 bg-white border-r flex flex-col mb-8 border-b border-gray-200">
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-gray-200">
-          <Heart className="w-8 h-8 text-[#415192]" />
-          <span className="ml-2 font-semibold text-gray-900">MatchMaker CRM</span>
+        <div className="flex flex-col items-center justify-center px-6 py-4 border-b border-gray-200 bg-white">
+          <img
+            src="/logo.png"
+            alt="A Muslim Matchmaker Logo"
+            className="h-26 w-auto object-contain"
+          />
+
+          <h1 className="mt-2 text-sm font-semibold tracking-wide text-gray-700 uppercase">
+            Admin Panel
+          </h1>
         </div>
 
         {/* Navigation */}
