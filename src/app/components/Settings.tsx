@@ -1,5 +1,5 @@
-import { HelpCircle, Scale, Lock, Edit, Eye, Save, X, Type } from "lucide-react";
-import { useState } from "react";
+import { HelpCircle, Scale, Lock, Edit, Eye, Save, X, Type, CheckCircle } from "lucide-react";
+import { useState, useRef } from "react";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import {
   ClassicEditor,
@@ -38,6 +38,16 @@ export function Settings() {
   const [termsSaved, setTermsSaved] = useState("");
   const [privacySaved, setPrivacySaved] = useState("");
 
+  // Toast
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string) => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast(message);
+    toastTimeout.current = setTimeout(() => setToast(null), 2800);
+  };
+
   // Privacy Header states
   const [privacyHeaderEditing, setPrivacyHeaderEditing] = useState(false);
   const [privacyHeaderTitle, setPrivacyHeaderTitle] = useState("");
@@ -48,7 +58,7 @@ export function Settings() {
   const handleSaveFaq = () => {
     setFaqSaved(faqContent);
     setFaqEditing(false);
-    alert("FAQ saved successfully!");
+    showToast("FAQ content saved successfully.");
   };
 
   const handleCancelFaq = () => {
@@ -59,7 +69,7 @@ export function Settings() {
   const handleSaveTerms = () => {
     setTermsSaved(termsContent);
     setTermsEditing(false);
-    alert("Terms and Conditions saved successfully!");
+    showToast("Terms and Conditions saved successfully.");
   };
 
   const handleCancelTerms = () => {
@@ -70,7 +80,7 @@ export function Settings() {
   const handleSavePrivacy = () => {
     setPrivacySaved(privacyContent);
     setPrivacyEditing(false);
-    alert("Privacy Policy saved successfully!");
+    showToast("Privacy Policy saved successfully.");
   };
 
   const handleCancelPrivacy = () => {
@@ -82,7 +92,7 @@ export function Settings() {
     setPrivacyHeaderTitleSaved(privacyHeaderTitle.trim() || null);
     setPrivacyHeaderSubtitleSaved(privacyHeaderSubtitle.trim() || null);
     setPrivacyHeaderEditing(false);
-    alert("Privacy Header saved successfully!");
+    showToast("Privacy Header saved successfully.");
   };
 
   const handleCancelPrivacyHeader = () => {
@@ -542,6 +552,32 @@ export function Settings() {
         </div>
 
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <style>{`
+            @keyframes toastSlide {
+              0%   { transform: translateX(110%); opacity: 0; }
+              10%  { transform: translateX(0);    opacity: 1; }
+              78%  { transform: translateX(0);    opacity: 1; }
+              100% { transform: translateX(0);    opacity: 0; }
+            }
+          `}</style>
+          <div
+            style={{ animation: "toastSlide 2.8s ease forwards" }}
+            className="flex items-center gap-3 bg-white border border-gray-200 shadow-xl rounded-xl px-5 py-4 min-w-[280px]"
+          >
+            <div className="flex items-center justify-center w-9 h-9 bg-green-100 rounded-full shrink-0">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Saved</p>
+              <p className="text-xs text-gray-500 mt-0.5">{toast}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
