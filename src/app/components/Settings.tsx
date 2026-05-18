@@ -1,4 +1,4 @@
-import { HelpCircle, Scale, Lock, Edit, Eye, Save, X } from "lucide-react";
+import { HelpCircle, Scale, Lock, Edit, Eye, Save, X, Type } from "lucide-react";
 import { useState } from "react";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import {
@@ -38,6 +38,13 @@ export function Settings() {
   const [termsSaved, setTermsSaved] = useState("");
   const [privacySaved, setPrivacySaved] = useState("");
 
+  // Privacy Header states
+  const [privacyHeaderEditing, setPrivacyHeaderEditing] = useState(false);
+  const [privacyHeaderTitle, setPrivacyHeaderTitle] = useState("");
+  const [privacyHeaderSubtitle, setPrivacyHeaderSubtitle] = useState("");
+  const [privacyHeaderTitleSaved, setPrivacyHeaderTitleSaved] = useState<string | null>(null);
+  const [privacyHeaderSubtitleSaved, setPrivacyHeaderSubtitleSaved] = useState<string | null>(null);
+
   const handleSaveFaq = () => {
     setFaqSaved(faqContent);
     setFaqEditing(false);
@@ -69,6 +76,19 @@ export function Settings() {
   const handleCancelPrivacy = () => {
     setPrivacyContent(privacySaved);
     setPrivacyEditing(false);
+  };
+
+  const handleSavePrivacyHeader = () => {
+    setPrivacyHeaderTitleSaved(privacyHeaderTitle.trim() || null);
+    setPrivacyHeaderSubtitleSaved(privacyHeaderSubtitle.trim() || null);
+    setPrivacyHeaderEditing(false);
+    alert("Privacy Header saved successfully!");
+  };
+
+  const handleCancelPrivacyHeader = () => {
+    setPrivacyHeaderTitle(privacyHeaderTitleSaved ?? "");
+    setPrivacyHeaderSubtitle(privacyHeaderSubtitleSaved ?? "");
+    setPrivacyHeaderEditing(false);
   };
 
   return (
@@ -436,6 +456,91 @@ export function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Privacy Header */}
+        <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Type className="w-6 h-6 text-[#415192]" />
+              <h2 className="text-lg font-semibold text-gray-900">Privacy Header</h2>
+            </div>
+            {!privacyHeaderEditing && (
+              <button
+                onClick={() => {
+                  setPrivacyHeaderTitle(privacyHeaderTitleSaved ?? "");
+                  setPrivacyHeaderSubtitle(privacyHeaderSubtitleSaved ?? "");
+                  setPrivacyHeaderEditing(true);
+                }}
+                className="px-4 py-2 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-colors flex items-center gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                {privacyHeaderTitleSaved === null && privacyHeaderSubtitleSaved === null ? "Add" : "Edit"}
+              </button>
+            )}
+          </div>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Set the title and subtitle displayed at the top of the Privacy section in the app</p>
+            {privacyHeaderEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                  <input
+                    type="text"
+                    value={privacyHeaderTitle}
+                    onChange={(e) => setPrivacyHeaderTitle(e.target.value)}
+                    placeholder="e.g. Privacy Policy"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#415192] focus:border-transparent bg-white text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subtitle</label>
+                  <input
+                    type="text"
+                    value={privacyHeaderSubtitle}
+                    onChange={(e) => setPrivacyHeaderSubtitle(e.target.value)}
+                    placeholder="e.g. Your privacy matters to us"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#415192] focus:border-transparent bg-white text-gray-900"
+                  />
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    onClick={handleSavePrivacyHeader}
+                    className="px-4 py-2 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-colors flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={handleCancelPrivacyHeader}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="border border-gray-300 rounded-lg p-4 bg-white min-h-[100px] flex flex-col justify-center">
+                {privacyHeaderTitleSaved !== null || privacyHeaderSubtitleSaved !== null ? (
+                  <div className="space-y-1">
+                    {privacyHeaderTitleSaved !== null && (
+                      <p className="text-xl font-semibold text-gray-900">{privacyHeaderTitleSaved}</p>
+                    )}
+                    {privacyHeaderSubtitleSaved !== null && (
+                      <p className="text-sm text-gray-500">{privacyHeaderSubtitleSaved}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 italic">No header set yet. Click Add to set the Privacy page header.</p>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              Tip: Keep the title concise and the subtitle as a short clarifying statement
+            </p>
+          </div>
+        </div>
+
       </div>
     </div>
   );
