@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from "react-router";
+import { Outlet, Link, useLocation, useNavigate } from "react-router";
 import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard,
@@ -33,9 +33,18 @@ const navItems = [
 ];
 
 export function RootLayout() {
-  const location = useLocation();
+  const location  = useLocation();
+  const navigate  = useNavigate();
+  const isAuth    = localStorage.getItem("amm_auth") === "true";
+
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAuth) {
+      navigate("/login", { replace: true });
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -43,19 +52,16 @@ export function RootLayout() {
         setShowProfileMenu(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = () => {
-    if (confirm("Are you sure you want to logout?")) {
-      alert("Logging out...");
-      // Add logout logic here
-    }
+    localStorage.removeItem("amm_auth");
+    navigate("/login", { replace: true });
   };
+
+  if (!isAuth) return null;
 
   return (
     <div className="flex h-screen bg-[#FFFFFF]">
