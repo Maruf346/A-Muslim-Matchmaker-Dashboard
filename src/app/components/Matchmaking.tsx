@@ -85,7 +85,7 @@ function MatchSuccessModal({ first, second, onClose }: MatchSuccessModalProps) {
           <div className="text-center">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold mx-auto mb-1.5 ring-2"
-              style={{ backgroundColor: firstColor, ringColor: firstRing, outline: `2px solid ${firstRing}`, outlineOffset: "2px" }}
+              style={{ backgroundColor: firstColor, outline: `2px solid ${firstRing}`, outlineOffset: "2px" }}
             >
               {first.name.charAt(0)}
             </div>
@@ -229,7 +229,7 @@ export function Matchmaking() {
         <p className="text-gray-500 mt-1">Select profiles to create a new match</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 items-start">
+      <div className={`grid grid-cols-3 gap-6 ${requestedGender ? "items-start" : "items-stretch"}`}>
 
         {/* ── Left: Requested Profiles ──────────────────────────────── */}
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -408,7 +408,7 @@ export function Matchmaking() {
         </div>
 
         {/* ── Centre: Match Preview ─────────────────────────────────── */}
-        <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center min-h-[320px]">
+        <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center min-h-[380px]">
           {selectedLeft && selectedRight ? (
             <div className="text-center w-full">
               <div className="flex items-center justify-center gap-4 mb-6">
