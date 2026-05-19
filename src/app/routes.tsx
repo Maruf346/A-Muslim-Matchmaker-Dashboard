@@ -7,6 +7,7 @@ import { Matchmaking } from "./components/Matchmaking";
 import { Requests } from "./components/Requests";
 import { Matches } from "./components/Matches";
 import { Leads } from "./components/Leads";
+import { LeadsList } from "./components/LeadsList";
 import { CustomFields } from "./components/CustomFields";
 import { Reports } from "./components/Reports";
 import { Settings } from "./components/Settings";
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { path: "requests", Component: Requests },
       { path: "matches", Component: Matches },
       { path: "leads", Component: Leads },
+      { path: "leads/:stage", Component: LeadsList },
       { path: "chat", Component: Chat },
       { path: "subscriptions", Component: Subscriptions },
       { path: "custom-fields", Component: CustomFields },
