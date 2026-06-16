@@ -13,6 +13,7 @@ import { CustomFields } from "./components/CustomFields";
 import { Reports } from "./components/Reports";
 import { Settings } from "./components/Settings";
 import { Profile } from "./components/Profile";
+import { MatchmakerProfile } from "./components/MatchmakerProfile";
 import { Chat } from "./components/Chat";
 import { Subscriptions } from "./components/Subscriptions";
 
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: "reports", Component: Reports },
       { path: "settings", Component: Settings },
       { path: "profile", Component: Profile },
+      { path: "matchmakers/:id", Component: MatchmakerProfile },
     ],
   },
 ]);
