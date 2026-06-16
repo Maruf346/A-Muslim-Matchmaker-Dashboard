@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { Search, Send, Circle, Info, Eye, MessageCircle, ChevronLeft, ChevronRight, X, MapPin, Briefcase } from "lucide-react";
+import { Search, Send, Plus, Paperclip, Circle, Info, Eye, MessageCircle, ChevronLeft, ChevronRight, X, MapPin, Briefcase } from "lucide-react";
 // import { Phone, Video } from "lucide-react"; // commented out — not needed
 import { mockUsers as profileData } from "../data/mockUsers";
 
@@ -19,6 +19,7 @@ interface Message {
   text: string;
   time: string;
   isAdmin: boolean;
+  fileName?: string;
 }
 
 const SIDEBAR_PAGE_SIZE = 5;
@@ -179,9 +180,11 @@ export function Chat() {
   const [selectedUser, setSelectedUser] = useState<User | null>(chatContacts[0]);
   const [searchTerm, setSearchTerm]     = useState("");
   const [messageText, setMessageText]   = useState("");
+  const [fileAttachment, setFileAttachment] = useState<File | null>(null);
   const [messages, setMessages]         = useState<Record<number, Message[]>>(mockMessages);
   const [sidebarPage, setSidebarPage]   = useState(1);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredContacts = chatContacts.filter((u) =>
     u.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -196,19 +199,22 @@ export function Chat() {
   const selectedProfile = selectedUser ? profileData.find((u) => u.id === selectedUser.id) : null;
 
   const handleSendMessage = () => {
-    if (!messageText.trim() || !selectedUser) return;
+    if (!messageText.trim() && !fileAttachment) return;
+    if (!selectedUser) return;
     const newMessage: Message = {
       id: (messages[selectedUser.id]?.length || 0) + 1,
       senderId: 0,
-      text: messageText,
+      text: messageText.trim(),
       time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       isAdmin: true,
+      fileName: fileAttachment?.name,
     };
     setMessages((prev) => ({
       ...prev,
       [selectedUser.id]: [...(prev[selectedUser.id] || []), newMessage],
     }));
     setMessageText("");
+    setFileAttachment(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -216,6 +222,16 @@ export function Chat() {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setFileAttachment(file);
+    e.target.value = "";
   };
 
   return (
@@ -356,7 +372,13 @@ export function Chat() {
                       : "bg-white text-gray-900 border border-gray-200"
                   }`}
                 >
-                  <p className="text-sm">{message.text}</p>
+                  {message.text && <p className="text-sm">{message.text}</p>}
+                  {message.fileName && (
+                    <div className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-2 ${message.isAdmin ? "bg-white/10 border border-white/20" : "bg-gray-50 border border-gray-200"}`}>
+                      <Paperclip className={`w-4 h-4 ${message.isAdmin ? "text-white/80" : "text-gray-500"}`} />
+                      <span className={`text-sm ${message.isAdmin ? "text-white/80" : "text-gray-700"}`}>{message.fileName}</span>
+                    </div>
+                  )}
                   <p className={`text-xs mt-1 ${message.isAdmin ? "text-white/70" : "text-gray-500"}`}>
                     {message.time}
                   </p>
@@ -367,7 +389,33 @@ export function Chat() {
 
           {/* Message Input */}
           <div className="border-t border-gray-200 p-4 bg-white shrink-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {fileAttachment && (
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-[#F9FAFB] px-3 py-2 text-sm text-gray-700">
+                <Paperclip className="w-4 h-4 text-gray-500" />
+                <span className="truncate max-w-xs">{fileAttachment.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setFileAttachment(null)}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                className="p-2 bg-[#F9FAFB] border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Plus className="w-4 h-4 text-gray-600" />
+              </button>
               <textarea
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
@@ -378,7 +426,7 @@ export function Chat() {
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!messageText.trim()}
+                disabled={!messageText.trim() && !fileAttachment}
                 className="px-4 py-2 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Send className="w-5 h-5" />
