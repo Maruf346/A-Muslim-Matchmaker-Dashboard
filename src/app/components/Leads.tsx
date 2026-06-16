@@ -5,7 +5,6 @@ import { mockLeads, LeadStatus } from "../data/mockLeads";
 const stages: LeadStatus[] = [
   "New Match",
   "Photos Revealed",
-  "Contact Shared",
   "In Discussion",
   "Married",
   "Dropped",
@@ -14,7 +13,6 @@ const stages: LeadStatus[] = [
 const stageColors: Record<LeadStatus, string> = {
   "New Match":       "bg-[#ACB5DA]/30 border-[#ACB5DA]",
   "Photos Revealed": "bg-[#ECCBCE]/30 border-[#ECCBCE]",
-  "Contact Shared":  "bg-[#D07C84]/30 border-[#D07C84]",
   "In Discussion":   "bg-[#ACB5DA]/50 border-[#415192]",
   "Married":         "bg-[#415192]/20 border-[#415192]",
   "Dropped":         "bg-gray-50 border-gray-200",

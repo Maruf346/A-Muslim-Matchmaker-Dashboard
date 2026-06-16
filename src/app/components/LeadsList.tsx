@@ -9,7 +9,7 @@ import { mockLeads, Lead, LeadStatus } from "../data/mockLeads";
 const STAGE_MAP: Record<string, LeadStatus> = {
   "new-match":       "New Match",
   "photos-revealed": "Photos Revealed",
-  "contact-shared":  "Contact Shared",
+  "contact-shared":  "In Discussion",
   "in-discussion":   "In Discussion",
   "married":         "Married",
   "dropped":         "Dropped",
@@ -18,7 +18,6 @@ const STAGE_MAP: Record<string, LeadStatus> = {
 const STATUS_STYLES: Record<LeadStatus, string> = {
   "New Match":       "bg-blue-100 text-blue-800",
   "Photos Revealed": "bg-purple-100 text-purple-800",
-  "Contact Shared":  "bg-orange-100 text-orange-800",
   "In Discussion":   "bg-amber-100 text-amber-800",
   "Married":         "bg-green-100 text-green-800",
   "Dropped":         "bg-gray-100 text-gray-600",
