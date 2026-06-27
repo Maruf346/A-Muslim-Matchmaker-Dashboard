@@ -1,20 +1,26 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router";
-import { ArrowLeft, Check, X, Heart, CheckCircle2, XCircle } from "lucide-react";
-import { mockUsers } from "../data/mockUsers";
+import { ArrowLeft, Check, X, Heart, CheckCircle2, XCircle, Pencil, Save } from "lucide-react";
+import { mockUsers, UserData } from "../data/mockUsers";
 
 type ProfileStatus = "pending" | "verified" | "deleted";
+
+const inputClass =
+  "mt-1 w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#415192]/30 bg-white";
 
 export function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const user = mockUsers.find((u) => u.id === Number(id));
+  const foundUser = mockUsers.find((u) => u.id === Number(id));
 
+  const [userData, setUserData] = useState<UserData | undefined>(foundUser);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("pending");
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<UserData | undefined>(foundUser);
 
-  if (!user) {
+  if (!userData || !editData) {
     return (
       <div className="p-8">
         <Link to="/users" className="flex items-center text-[#415192] hover:underline mb-4">
@@ -29,6 +35,29 @@ export function UserDetail() {
     );
   }
 
+  const handleEdit = () => {
+    setEditData({ ...userData, preferences: { ...userData.preferences } });
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    setUserData(editData);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditData({ ...userData, preferences: { ...userData.preferences } });
+    setIsEditing(false);
+  };
+
+  const setField = (field: keyof UserData, value: string | number) =>
+    setEditData((prev) => prev ? { ...prev, [field]: value } : prev);
+
+  const setPref = (field: keyof UserData["preferences"], value: string) =>
+    setEditData((prev) =>
+      prev ? { ...prev, preferences: { ...prev.preferences, [field]: value } } : prev
+    );
+
   return (
     <div className="p-8">
 
@@ -42,7 +71,7 @@ export function UserDetail() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Verify this Profile?</h3>
               <p className="text-sm text-gray-500 mt-2">
-                <span className="font-medium text-gray-700">{user.name}</span>'s profile will be
+                <span className="font-medium text-gray-700">{userData.name}</span>'s profile will be
                 marked as verified and made visible for matching.
               </p>
             </div>
@@ -74,7 +103,7 @@ export function UserDetail() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Delete this Profile?</h3>
               <p className="text-sm text-gray-500 mt-2">
-                <span className="font-medium text-gray-700">{user.name}</span>'s profile will be
+                <span className="font-medium text-gray-700">{userData.name}</span>'s profile will be
                 deleted and removed from matches.
               </p>
             </div>
@@ -102,7 +131,37 @@ export function UserDetail() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Users
         </Link>
-        <h1 className="text-3xl font-semibold text-gray-900">User Details</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-semibold text-gray-900">User Details</h1>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#415192] text-white rounded-lg text-sm font-medium hover:bg-[#354177] transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Changes
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Profile
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
@@ -114,27 +173,56 @@ export function UserDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-500">Full Name</label>
-                <p className="text-gray-900 mt-1">{user.name}</p>
+                {isEditing ? (
+                  <input value={editData.name} onChange={(e) => setField("name", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.name}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Age</label>
-                <p className="text-gray-900 mt-1">{user.age} years</p>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={editData.age}
+                    onChange={(e) => setField("age", Number(e.target.value))}
+                    className={inputClass}
+                  />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.age} years</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Gender</label>
-                <p className="text-gray-900 mt-1">{user.gender}</p>
+                {isEditing ? (
+                  <input value={editData.gender} onChange={(e) => setField("gender", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.gender}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Religion</label>
-                <p className="text-gray-900 mt-1">{user.religion}</p>
+                {isEditing ? (
+                  <input value={editData.religion} onChange={(e) => setField("religion", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.religion}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Location</label>
-                <p className="text-gray-900 mt-1">{user.location}</p>
+                {isEditing ? (
+                  <input value={editData.location} onChange={(e) => setField("location", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.location}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Profession</label>
-                <p className="text-gray-900 mt-1">{user.profession}</p>
+                {isEditing ? (
+                  <input value={editData.profession} onChange={(e) => setField("profession", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.profession}</p>
+                )}
               </div>
             </div>
           </div>
@@ -145,19 +233,35 @@ export function UserDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-500">Education</label>
-                <p className="text-gray-900 mt-1">{user.education}</p>
+                {isEditing ? (
+                  <input value={editData.education} onChange={(e) => setField("education", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.education}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Marital Status</label>
-                <p className="text-gray-900 mt-1">{user.maritalStatus}</p>
+                {isEditing ? (
+                  <input value={editData.maritalStatus} onChange={(e) => setField("maritalStatus", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.maritalStatus}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Height</label>
-                <p className="text-gray-900 mt-1">{user.height}</p>
+                {isEditing ? (
+                  <input value={editData.height} onChange={(e) => setField("height", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.height}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Ethnicity</label>
-                <p className="text-gray-900 mt-1">{user.ethnicity}</p>
+                {isEditing ? (
+                  <input value={editData.ethnicity} onChange={(e) => setField("ethnicity", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.ethnicity}</p>
+                )}
               </div>
             </div>
           </div>
@@ -168,19 +272,35 @@ export function UserDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-500">Father's Occupation</label>
-                <p className="text-gray-900 mt-1">{user.fatherOccupation}</p>
+                {isEditing ? (
+                  <input value={editData.fatherOccupation} onChange={(e) => setField("fatherOccupation", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.fatherOccupation}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Mother's Occupation</label>
-                <p className="text-gray-900 mt-1">{user.motherOccupation}</p>
+                {isEditing ? (
+                  <input value={editData.motherOccupation} onChange={(e) => setField("motherOccupation", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.motherOccupation}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Siblings</label>
-                <p className="text-gray-900 mt-1">{user.siblings}</p>
+                {isEditing ? (
+                  <input value={editData.siblings} onChange={(e) => setField("siblings", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.siblings}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Family Type</label>
-                <p className="text-gray-900 mt-1">{user.familyType}</p>
+                {isEditing ? (
+                  <input value={editData.familyType} onChange={(e) => setField("familyType", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.familyType}</p>
+                )}
               </div>
             </div>
           </div>
@@ -191,19 +311,35 @@ export function UserDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-500">Age Range</label>
-                <p className="text-gray-900 mt-1">{user.preferences.ageRange}</p>
+                {isEditing ? (
+                  <input value={editData.preferences.ageRange} onChange={(e) => setPref("ageRange", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.preferences.ageRange}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Education</label>
-                <p className="text-gray-900 mt-1">{user.preferences.education}</p>
+                {isEditing ? (
+                  <input value={editData.preferences.education} onChange={(e) => setPref("education", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.preferences.education}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Profession</label>
-                <p className="text-gray-900 mt-1">{user.preferences.profession}</p>
+                {isEditing ? (
+                  <input value={editData.preferences.profession} onChange={(e) => setPref("profession", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.preferences.profession}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-gray-500">Location</label>
-                <p className="text-gray-900 mt-1">{user.preferences.location}</p>
+                {isEditing ? (
+                  <input value={editData.preferences.location} onChange={(e) => setPref("location", e.target.value)} className={inputClass} />
+                ) : (
+                  <p className="text-gray-900 mt-1">{userData.preferences.location}</p>
+                )}
               </div>
             </div>
           </div>
@@ -214,20 +350,20 @@ export function UserDetail() {
           {/* Profile Photo */}
           <div className="bg-[#F9FAFB] rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="w-full aspect-square bg-gradient-to-br from-[#415192] to-[#ACB5DA] rounded-lg flex items-center justify-center text-white text-6xl font-light">
-              {user.name.charAt(0)}
+              {userData.name.charAt(0)}
             </div>
             <div className="mt-4 text-center">
-              <p className="font-semibold text-gray-900">{user.name}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{user.profession}</p>
+              <p className="font-semibold text-gray-900">{userData.name}</p>
+              <p className="text-sm text-gray-500 mt-0.5">{userData.profession}</p>
               <div className="mt-3">
                 <div className="flex items-center gap-2 justify-center">
                   <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                     <div
                       className="bg-[#415192] h-1.5 rounded-full"
-                      style={{ width: `${user.completion}%` }}
+                      style={{ width: `${userData.completion}%` }}
                     />
                   </div>
-                  <span className="text-xs text-gray-500">{user.completion}%</span>
+                  <span className="text-xs text-gray-500">{userData.completion}%</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Profile completion</p>
               </div>
@@ -262,9 +398,7 @@ export function UserDetail() {
               ) : (
                 <button
                   onClick={() => setShowApproveModal(true)}
-                  className={`w-full px-4 py-2 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-all flex items-center justify-center gap-2 text-sm ${
-                    profileStatus === "deleted" ? "opacity-40 pointer-events-none" : ""
-                  }`}
+                  className="w-full px-4 py-2 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-all flex items-center justify-center gap-2 text-sm"
                 >
                   <Check className="w-4 h-4" />
                   Verify Profile
@@ -289,9 +423,7 @@ export function UserDetail() {
               ) : (
                 <button
                   onClick={() => setShowRejectModal(true)}
-                  className={`w-full px-4 py-2 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-all flex items-center justify-center gap-2 text-sm ${
-                    profileStatus === "verified" ? "opacity-40 pointer-events-none" : ""
-                  }`}
+                  className="w-full px-4 py-2 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-all flex items-center justify-center gap-2 text-sm"
                 >
                   <X className="w-4 h-4" />
                   Delete Profile
@@ -304,7 +436,7 @@ export function UserDetail() {
           <div className="bg-[#F9FAFB] rounded-xl shadow-sm p-6 border border-gray-100">
             <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
             <div className="space-y-3">
-              {user.recentActivity.map((activity, index) => (
+              {userData.recentActivity.map((activity, index) => (
                 <div key={index} className="text-sm">
                   <p className="text-gray-900">{activity.event}</p>
                   <p className="text-gray-500 text-xs">{activity.time}</p>
