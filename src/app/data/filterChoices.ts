@@ -1,25 +1,32 @@
 export const GENDER_OPTIONS = ["Male", "Female"];
 
-export const VERIFICATION_OPTIONS = ["Verified", "Unverified"];
+export const SECT_OPTIONS = ["Sunni", "Salafi"];
 
 export const MARITAL_STATUS_OPTIONS = [
-  "Never Married",
+  "Never been married",
   "Married (Polygyny)",
   "Annulment (Khula)",
   "Divorced",
   "Widowed",
 ];
 
-export const EMPLOYMENT_OPTIONS = [
-  "Employed",
-  "Self-Employed",
-  "Unemployed",
-  "Student",
-  "Business Owner",
-  "Other",
+export const CHILDREN_COUNT_OPTIONS = [
+  "None",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5+",
 ];
 
 export const PRAY_OPTIONS = ["Yes", "Mostly", "No"];
+
+export const RELOCATION_OPTIONS = [
+  "Yes",
+  "No",
+  "Maybe (open for discussion)",
+  "Not right now, but at a later time",
+];
 
 export const DRESS_OPTIONS = [
   "No Hijab",
@@ -28,7 +35,7 @@ export const DRESS_OPTIONS = [
   "Niqab",
 ];
 
-export const CHILDREN_OPTIONS = ["None", "1", "2", "3", "4", "5+"];
+export const PREFERRED_DRESS_OPTIONS = [...DRESS_OPTIONS];
 
 export const HOW_FOUND_OPTIONS = [
   "By Referral",
@@ -42,7 +49,75 @@ export const HOW_FOUND_OPTIONS = [
   "Other",
 ];
 
-export const SUBSCRIPTION_OPTIONS = ["Free", "Monthly", "Annual"];
+export const EDUCATION_OPTIONS = [
+  "High School Graduate",
+  "Associates Degree",
+  "Technical Degree",
+  "College",
+  "Bachelors Degree",
+  "Masters Degree",
+  "Graduate Degree",
+  "J.D./M.D./PhD",
+  "Other",
+];
+
+export const INCOME_OPTIONS = [
+  "£0 - £12k",
+  "£12k - £20k",
+  "£20k - £50k",
+  "£50k - £100k",
+  "£100k - £300k",
+  "£300k - £500k",
+  "£500k+",
+  "Would rather not share",
+  "Unemployed",
+];
+
+export const FRAME_OPTIONS = [
+  "Petite",
+  "Slim",
+  "Average",
+  "Fit/Athletic",
+  "Muscular",
+  "Curvy",
+  "A few Extra Pounds",
+  "Wider frame",
+  "Bulky",
+];
+
+export const LANGUAGE_OPTIONS = [
+  "Arabic",
+  "English",
+  "French",
+  "Spanish",
+  "Urdu",
+  "Hindi",
+  "Bengali",
+  "Turkish",
+  "Hausa",
+  "Swahili",
+  "Malay",
+  "Indonesian",
+  "Somali",
+  "Persian/Farsi",
+  "Pashto",
+  "Punjabi",
+  "German",
+  "Portuguese",
+  "Russian",
+  "Chinese (Mandarin)",
+  "Other",
+];
+
+export const WALI_RELATION_OPTIONS = [
+  "Father",
+  "Brother",
+  "Uncle",
+  "Grandfather",
+  "Other",
+];
+
+export const WALI_GENDER_OPTIONS = ["Male", "Female"];
 
 export const ETHNICITY_OPTIONS = [
   "Afghan", "African-American", "Albanian", "Algerian", "American", "Andorran",

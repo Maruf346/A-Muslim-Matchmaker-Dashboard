@@ -16,6 +16,15 @@ import { Profile } from "./components/Profile";
 import { MatchmakerProfile } from "./components/MatchmakerProfile";
 import { Chat } from "./components/Chat";
 import { Subscriptions } from "./components/Subscriptions";
+import { SuperAdminRoute } from "./components/SuperAdminRoute";
+
+function SubscriptionsPage() {
+  return (
+    <SuperAdminRoute>
+      <Subscriptions />
+    </SuperAdminRoute>
+  );
+}
 
 export const router = createBrowserRouter([
   { path: "/login", Component: Login },
@@ -32,7 +41,7 @@ export const router = createBrowserRouter([
       { path: "leads", Component: Leads },
       { path: "leads/:stage", Component: LeadsList },
       { path: "chat", Component: Chat },
-      { path: "subscriptions", Component: Subscriptions },
+      { path: "subscriptions", Component: SubscriptionsPage },
       { path: "custom-fields", Component: CustomFields },
       { path: "reports", Component: Reports },
       { path: "settings", Component: Settings },

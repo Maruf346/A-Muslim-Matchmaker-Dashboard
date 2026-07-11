@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -9,16 +9,33 @@ import {
   Layers,
   Settings,
   BarChart3,
-  FileText,
   User,
   LogOut,
   ChevronUp,
   MessageCircle,
-  CreditCard
+  CreditCard,
+  type LucideIcon,
 } from "lucide-react";
-import { span } from "motion/react-m";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import {
+  clearAuthSession,
+  getAuthUser,
+  getUserDisplayName,
+  getUserInitials,
+  isAuthenticated,
+  isSuperAdmin,
+  getAuthSession,
+} from "../lib/authStorage";
+import { logoutUser } from "../api/auth";
 
-const navItems = [
+interface NavItem {
+  path: string;
+  label: string;
+  icon: LucideIcon;
+  superAdminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/users", label: "Users", icon: Users },
   { path: "/matchmaking", label: "Matchmaking", icon: Heart },
@@ -26,25 +43,35 @@ const navItems = [
   { path: "/matches", label: "Matches", icon: CheckCircle2 },
   { path: "/leads", label: "Leads", icon: Layers },
   { path: "/chat", label: "Chat with User", icon: MessageCircle },
-  { path: "/subscriptions", label: "Subscriptions & Payments", icon: CreditCard },
-  // { path: "/custom-fields", label: "Custom Fields", icon: FileText },
+  {
+    path: "/subscriptions",
+    label: "Subscriptions & Payments",
+    icon: CreditCard,
+    superAdminOnly: true,
+  },
   { path: "/reports", label: "Reports", icon: BarChart3 },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function RootLayout() {
-  const location  = useLocation();
-  const navigate  = useNavigate();
-  const isAuth    = localStorage.getItem("amm_auth") === "true";
+  const location = useLocation();
+  const navigate = useNavigate();
+  const authUser = getAuthUser();
+  const canAccessFinancials = isSuperAdmin();
+
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => !item.superAdminOnly || canAccessFinancials),
+    [canAccessFinancials],
+  );
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isAuth) {
+    if (!isAuthenticated()) {
       navigate("/login", { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,18 +83,29 @@ export function RootLayout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("amm_auth");
-    navigate("/login", { replace: true });
+  const handleLogout = async () => {
+    const session = getAuthSession();
+
+    try {
+      if (session?.refreshToken) {
+        await logoutUser(session.refreshToken);
+      }
+    } finally {
+      clearAuthSession();
+      setShowProfileMenu(false);
+      navigate("/login", { replace: true });
+    }
   };
 
-  if (!isAuth) return null;
+  if (!isAuthenticated()) return null;
+
+  const displayName = getUserDisplayName(authUser);
+  const displayEmail = authUser?.email ?? "—";
+  const initials = getUserInitials(authUser);
 
   return (
     <div className="flex h-screen bg-[#FFFFFF]">
-      {/* Sidebar */}
       <aside className="w-64 bg-white border-r flex flex-col mb-8 border-b border-gray-200">
-        {/* Logo */}
         <div className="flex flex-col items-center justify-center px-6 py-4 border-b border-gray-200 bg-white">
           <img
             src="/logo.png"
@@ -80,11 +118,11 @@ export function RootLayout() {
           </h1>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path ||
+            const isActive =
+              location.pathname === item.path ||
               (item.path !== "/" && location.pathname.startsWith(item.path));
 
             return (
@@ -104,9 +142,7 @@ export function RootLayout() {
           })}
         </nav>
 
-        {/* User Profile */}
         <div className="p-4 border-t border-gray-200 relative" ref={profileRef}>
-          {/* Dropdown Menu */}
           {showProfileMenu && (
             <div className="absolute bottom-full left-4 right-4 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
               <Link
@@ -148,24 +184,32 @@ export function RootLayout() {
             </div>
           )}
 
-          {/* Profile Button */}
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="w-full flex items-center hover:bg-gray-50 rounded-lg p-2 transition-colors"
           >
-            <div className="w-10 h-10 rounded-full bg-[#415192] flex items-center justify-center text-white">
-              A
+            {authUser?.profile_picture ? (
+              <ImageWithFallback
+                src={authUser.profile_picture}
+                alt={displayName}
+                className="w-10 h-10 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#415192] flex items-center justify-center text-white shrink-0">
+                {initials}
+              </div>
+            )}
+            <div className="ml-3 flex-1 text-left min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+              <p className="text-xs text-gray-500 truncate">{displayEmail}</p>
             </div>
-            <div className="ml-3 flex-1 text-left">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500">admin@matchmaker.com</p>
-            </div>
-            <ChevronUp className={`w-4 h-4 text-gray-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+            <ChevronUp
+              className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showProfileMenu ? "rotate-180" : ""}`}
+            />
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>

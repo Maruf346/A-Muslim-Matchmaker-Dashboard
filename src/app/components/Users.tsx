@@ -1,76 +1,228 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Search, Filter, Eye, Ban, ShieldCheck, X, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { Ban, CheckCircle2, Eye, Filter, Loader2, Search, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import { TablePagination } from "./ui/TablePagination";
-import { mockUsers } from "../data/mockUsers";
 import {
-  GENDER_OPTIONS, VERIFICATION_OPTIONS, MARITAL_STATUS_OPTIONS, ETHNICITY_OPTIONS,
-  NATIONALITY_OPTIONS, EMPLOYMENT_OPTIONS, HOW_FOUND_OPTIONS, DRESS_OPTIONS,
-  PRAY_OPTIONS, CHILDREN_OPTIONS, SUBSCRIPTION_OPTIONS,
+  blockUser,
+  listUsers,
+  type AdminUserAccount,
+} from "../api/adminUsers";
+import { ApiError } from "../api/errors";
+import {
+  CHILDREN_COUNT_OPTIONS,
+  EDUCATION_OPTIONS,
+  ETHNICITY_OPTIONS,
+  FRAME_OPTIONS,
+  HOW_FOUND_OPTIONS,
+  INCOME_OPTIONS,
+  LANGUAGE_OPTIONS,
+  MARITAL_STATUS_OPTIONS,
+  NATIONALITY_OPTIONS,
+  PRAY_OPTIONS,
+  RELOCATION_OPTIONS,
+  SECT_OPTIONS,
 } from "../data/filterChoices";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+type TriState = "" | "true" | "false";
 
-type FilterValues = {
-  name: string; code: string; gender: string;
-  ageMin: string; ageMax: string; verification: string;
-  maritalStatus: string; location: string; ethnicity: string;
-  nationality: string; employment: string; height: string;
-  weight: string; howFound: string; dress: string;
-  pray: string; children: string; subscription: string;
-  prefAgeRange: string; prefEthnicity: string; prefMaritalStatus: string;
+type UserFilters = {
+  about_yourself: string;
+  age: string;
+  children_count: string;
+  city: string;
+  country: string;
+  date_of_birth: string;
+  education: string;
+  employment: string;
+  envision_marriage: string;
+  envision_spouse: string;
+  ethnicity: string;
+  frame: string;
+  gender: string;
+  has_children: TriState;
+  health_concerns: string;
+  height: string;
+  how_found: string;
+  income: string;
+  is_active: TriState;
+  is_verified: TriState;
+  languages_spoken: string;
+  marital_status: string;
+  nationality: string;
+  open_to_relocate: string;
+  open_to_relocate_details: string;
+  ordering: string;
+  other_preferences: string;
+  pray_5x: string;
+  pref_age_max: string;
+  pref_age_min: string;
+  pref_country_of_residence: string;
+  pref_ethnicity: string;
+  pref_marital_status: string;
+  relationship_with_islam: string;
+  role: string;
+  role_as_spouse: string;
+  sect: string;
+  spouse_religious_status_pref: string;
+  subscription_plan: string;
+  wali_profile_gender: string;
+  wali_profile_how_found: string;
+  wali_profile_phone: string;
+  wali_profile_relation_to_sister: string;
+  weight: string;
 };
 
-const EMPTY_FILTERS: FilterValues = {
-  name: "", code: "", gender: "", ageMin: "", ageMax: "", verification: "",
-  maritalStatus: "", location: "", ethnicity: "", nationality: "",
-  employment: "", height: "", weight: "", howFound: "", dress: "",
-  pray: "", children: "", subscription: "", prefAgeRange: "",
-  prefEthnicity: "", prefMaritalStatus: "",
+const EMPTY_FILTERS: UserFilters = {
+  about_yourself: "",
+  age: "",
+  children_count: "",
+  city: "",
+  country: "",
+  date_of_birth: "",
+  education: "",
+  employment: "",
+  envision_marriage: "",
+  envision_spouse: "",
+  ethnicity: "",
+  frame: "",
+  gender: "",
+  has_children: "",
+  health_concerns: "",
+  height: "",
+  how_found: "",
+  income: "",
+  is_active: "",
+  is_verified: "",
+  languages_spoken: "",
+  marital_status: "",
+  nationality: "",
+  open_to_relocate: "",
+  open_to_relocate_details: "",
+  ordering: "",
+  other_preferences: "",
+  pray_5x: "",
+  pref_age_max: "",
+  pref_age_min: "",
+  pref_country_of_residence: "",
+  pref_ethnicity: "",
+  pref_marital_status: "",
+  relationship_with_islam: "",
+  role: "",
+  role_as_spouse: "",
+  sect: "",
+  spouse_religious_status_pref: "",
+  subscription_plan: "",
+  wali_profile_gender: "",
+  wali_profile_how_found: "",
+  wali_profile_phone: "",
+  wali_profile_relation_to_sister: "",
+  weight: "",
 };
 
-// ── Shared field styles ───────────────────────────────────────────────────────
+const ROLE_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Wali", value: "wali" },
+];
+
+const GENDER_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+];
+
+const BOOLEAN_OPTIONS = [
+  { label: "Any", value: "" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
+const SUBSCRIPTION_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Free", value: "free" },
+  { label: "Monthly", value: "monthly" },
+  { label: "Annual", value: "annual" },
+];
+
+const ORDERING_OPTIONS = [
+  { label: "Newest first", value: "-created_at" },
+  { label: "Oldest first", value: "created_at" },
+  { label: "Last active", value: "-last_active" },
+  { label: "Age ascending", value: "age" },
+  { label: "Age descending", value: "-age" },
+];
 
 const fieldClass =
   "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#415192]/30 bg-white";
 
-// ── Small reusable field wrappers ─────────────────────────────────────────────
+function displayValue(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
 
-function FL({ label, children }: { label: string; children: React.ReactNode }) {
+function formatBool(value: boolean | null | undefined) {
+  if (value === null || value === undefined) return "—";
+  return value ? "Yes" : "No";
+}
+
+function formatRole(role: string | null | undefined) {
+  if (!role) return "—";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function formatName(user: AdminUserAccount) {
+  return `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || user.email;
+}
+
+function initialsFor(user: AdminUserAccount) {
+  const first = user.first_name?.charAt(0) ?? "";
+  const last = user.last_name?.charAt(0) ?? "";
+  const initials = `${first}${last}`.trim();
+  return initials.toUpperCase() || user.email.charAt(0).toUpperCase();
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+}) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1.5">{label}</label>
-      {children}
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={fieldClass}>
+        {options.map((option) => (
+          <option key={`${label}-${option.value}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
 
-function FSel({
-  label, value, onChange, options, placeholder = "All",
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
 }: {
-  label: string; value: string; onChange: (v: string) => void;
-  options: string[]; placeholder?: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
 }) {
   return (
-    <FL label={label}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={fieldClass}>
-        <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-    </FL>
-  );
-}
-
-function FIn({
-  label, value, onChange, placeholder = "", type = "text",
-}: {
-  label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string;
-}) {
-  return (
-    <FL label={label}>
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}
@@ -78,7 +230,7 @@ function FIn({
         placeholder={placeholder}
         className={fieldClass}
       />
-    </FL>
+    </div>
   );
 }
 
@@ -90,33 +242,113 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+function triStateToBoolean(value: TriState) {
+  if (value === "") return undefined;
+  return value === "true";
+}
 
 export function Users() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Applied filters (used for actual table filtering)
-  const [applied, setApplied] = useState<FilterValues>(EMPTY_FILTERS);
-  // Draft filters (shown in the popup before Apply is clicked)
-  const [draft, setDraft] = useState<FilterValues>(EMPTY_FILTERS);
+  const [applied, setApplied] = useState<UserFilters>(EMPTY_FILTERS);
+  const [draft, setDraft] = useState<UserFilters>(EMPTY_FILTERS);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
+  const [users, setUsers] = useState<AdminUserAccount[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadIndex, setReloadIndex] = useState(0);
 
-  // Block states
-  const [blockedUsers, setBlockedUsers] = useState<Set<number>>(new Set());
-  const [blockConfirmUserId, setBlockConfirmUserId] = useState<number | null>(null);
-  const [unblockConfirmUserId, setUnblockConfirmUserId] = useState<number | null>(null);
+  const [blockTarget, setBlockTarget] = useState<AdminUserAccount | null>(null);
+  const [blockAction, setBlockAction] = useState<"block" | "unblock" | null>(null);
+  const [blockSaving, setBlockSaving] = useState(false);
 
-  const resetPage = () => setCurrentPage(1);
+  const activeCount = useMemo(() => {
+    const appliedCount = Object.values(applied).filter((value) => value !== "").length;
+    return appliedCount + Number(Boolean(searchTerm.trim()));
+  }, [applied, searchTerm]);
 
-  // Count of active applied filters
-  const activeCount = Object.values(applied).filter((v) => v !== "").length;
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const setDraftField = (field: keyof FilterValues, value: string) =>
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await listUsers({
+          page: currentPage,
+          page_size: pageSize,
+          search: debouncedSearch || undefined,
+          about_yourself: applied.about_yourself || undefined,
+          age: applied.age || undefined,
+          children_count: applied.children_count || undefined,
+          city: applied.city || undefined,
+          country: applied.country || undefined,
+          date_of_birth: applied.date_of_birth || undefined,
+          education: applied.education || undefined,
+          employment: applied.employment || undefined,
+          envision_marriage: applied.envision_marriage || undefined,
+          envision_spouse: applied.envision_spouse || undefined,
+          ethnicity: applied.ethnicity || undefined,
+          frame: applied.frame || undefined,
+          gender: applied.gender || undefined,
+          has_children: triStateToBoolean(applied.has_children),
+          health_concerns: applied.health_concerns || undefined,
+          height: applied.height || undefined,
+          how_found: applied.how_found || undefined,
+          income: applied.income || undefined,
+          is_active: triStateToBoolean(applied.is_active),
+          is_verified: triStateToBoolean(applied.is_verified),
+          languages_spoken: applied.languages_spoken || undefined,
+          marital_status: applied.marital_status || undefined,
+          nationality: applied.nationality || undefined,
+          open_to_relocate: applied.open_to_relocate || undefined,
+          open_to_relocate_details: applied.open_to_relocate_details || undefined,
+          ordering: applied.ordering || undefined,
+          other_preferences: applied.other_preferences || undefined,
+          pray_5x: applied.pray_5x || undefined,
+          pref_age_max: applied.pref_age_max || undefined,
+          pref_age_min: applied.pref_age_min || undefined,
+          pref_country_of_residence: applied.pref_country_of_residence || undefined,
+          pref_ethnicity: applied.pref_ethnicity || undefined,
+          pref_marital_status: applied.pref_marital_status || undefined,
+          relationship_with_islam: applied.relationship_with_islam || undefined,
+          role: applied.role || undefined,
+          role_as_spouse: applied.role_as_spouse || undefined,
+          sect: applied.sect || undefined,
+          spouse_religious_status_pref: applied.spouse_religious_status_pref || undefined,
+          subscription_plan: applied.subscription_plan || undefined,
+          wali_profile_gender: applied.wali_profile_gender || undefined,
+          wali_profile_how_found: applied.wali_profile_how_found || undefined,
+          wali_profile_phone: applied.wali_profile_phone || undefined,
+          wali_profile_relation_to_sister: applied.wali_profile_relation_to_sister || undefined,
+          weight: applied.weight || undefined,
+        });
+
+        setUsers(response.results ?? []);
+        setTotalCount(response.count ?? 0);
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Unable to load users.";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [applied, currentPage, debouncedSearch, pageSize, reloadIndex]);
+
+  const setDraftField = (field: keyof UserFilters, value: string) => {
     setDraft((prev) => ({ ...prev, [field]: value }));
+  };
 
   const openModal = () => {
     setDraft({ ...applied });
@@ -132,258 +364,301 @@ export function Users() {
   const clearDraft = () => setDraft({ ...EMPTY_FILTERS });
 
   const clearApplied = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
     setApplied({ ...EMPTY_FILTERS });
     setDraft({ ...EMPTY_FILTERS });
-    resetPage();
+    setCurrentPage(1);
   };
 
-  // ── Filter logic ──────────────────────────────────────────────────────────
+  const handleBlockAction = async () => {
+    if (!blockTarget || !blockAction) return;
 
-  const filteredUsers = mockUsers.filter((user) => {
-    // Main quick search (name / location / profession)
-    if (searchTerm) {
-      const t = searchTerm.toLowerCase();
-      if (
-        !user.name.toLowerCase().includes(t) &&
-        !user.location.toLowerCase().includes(t) &&
-        !user.profession.toLowerCase().includes(t)
-      ) return false;
+    setBlockSaving(true);
+
+    try {
+      await blockUser(blockTarget.id, blockAction === "unblock");
+      setBlockTarget(null);
+      setBlockAction(null);
+      const response = await listUsers({
+        page: currentPage,
+        page_size: pageSize,
+        search: debouncedSearch || undefined,
+        about_yourself: applied.about_yourself || undefined,
+        age: applied.age || undefined,
+        children_count: applied.children_count || undefined,
+        city: applied.city || undefined,
+        country: applied.country || undefined,
+        date_of_birth: applied.date_of_birth || undefined,
+        education: applied.education || undefined,
+        employment: applied.employment || undefined,
+        envision_marriage: applied.envision_marriage || undefined,
+        envision_spouse: applied.envision_spouse || undefined,
+        ethnicity: applied.ethnicity || undefined,
+        frame: applied.frame || undefined,
+        gender: applied.gender || undefined,
+        has_children: triStateToBoolean(applied.has_children),
+        health_concerns: applied.health_concerns || undefined,
+        height: applied.height || undefined,
+        how_found: applied.how_found || undefined,
+        income: applied.income || undefined,
+        is_active: triStateToBoolean(applied.is_active),
+        is_verified: triStateToBoolean(applied.is_verified),
+        languages_spoken: applied.languages_spoken || undefined,
+        marital_status: applied.marital_status || undefined,
+        nationality: applied.nationality || undefined,
+        open_to_relocate: applied.open_to_relocate || undefined,
+        open_to_relocate_details: applied.open_to_relocate_details || undefined,
+        ordering: applied.ordering || undefined,
+        other_preferences: applied.other_preferences || undefined,
+        pray_5x: applied.pray_5x || undefined,
+        pref_age_max: applied.pref_age_max || undefined,
+        pref_age_min: applied.pref_age_min || undefined,
+        pref_country_of_residence: applied.pref_country_of_residence || undefined,
+        pref_ethnicity: applied.pref_ethnicity || undefined,
+        pref_marital_status: applied.pref_marital_status || undefined,
+        relationship_with_islam: applied.relationship_with_islam || undefined,
+        role: applied.role || undefined,
+        role_as_spouse: applied.role_as_spouse || undefined,
+        sect: applied.sect || undefined,
+        spouse_religious_status_pref: applied.spouse_religious_status_pref || undefined,
+        subscription_plan: applied.subscription_plan || undefined,
+        wali_profile_gender: applied.wali_profile_gender || undefined,
+        wali_profile_how_found: applied.wali_profile_how_found || undefined,
+        wali_profile_phone: applied.wali_profile_phone || undefined,
+        wali_profile_relation_to_sister: applied.wali_profile_relation_to_sister || undefined,
+        weight: applied.weight || undefined,
+      });
+      setUsers(response.results ?? []);
+      setTotalCount(response.count ?? 0);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Unable to update user status.";
+      setError(message);
+    } finally {
+      setBlockSaving(false);
     }
-
-    const f = applied;
-
-    // Name
-    if (f.name && !user.name.toLowerCase().includes(f.name.toLowerCase())) return false;
-
-    // Code (mapped to user id in mock data)
-    if (f.code && !String(user.id).includes(f.code)) return false;
-
-    // Gender
-    if (f.gender && user.gender !== f.gender) return false;
-
-    // Age range
-    if (f.ageMin && user.age < Number(f.ageMin)) return false;
-    if (f.ageMax && user.age > Number(f.ageMax)) return false;
-
-    // Marital status (direct label match against mock data values)
-    if (f.maritalStatus && user.maritalStatus !== f.maritalStatus) return false;
-
-    // Location (partial match)
-    if (f.location && !user.location.toLowerCase().includes(f.location.toLowerCase())) return false;
-
-    // Ethnicity (partial match — mock data uses broad categories; real data will match granular choices)
-    if (f.ethnicity && !user.ethnicity.toLowerCase().includes(f.ethnicity.toLowerCase())) return false;
-
-    // Height (partial text match on stored string, e.g. "5'6"")
-    if (f.height && !user.height.toLowerCase().includes(f.height.toLowerCase())) return false;
-
-    // Preferred age range (partial match on preferences string)
-    if (f.prefAgeRange && !user.preferences.ageRange.toLowerCase().includes(f.prefAgeRange.toLowerCase())) return false;
-
-    // Fields without mock data (nationality, employment, weight, howFound,
-    // dress, pray, children, subscription, verification, prefEthnicity,
-    // prefMaritalStatus) — UI-ready for real backend, no-op on mock data.
-
-    return true;
-  });
-
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  const confirmBlockUser = (userId: number) => {
-    setBlockedUsers((prev) => new Set([...prev, userId]));
-    setBlockConfirmUserId(null);
   };
-
-  const confirmUnblockUser = (userId: number) => {
-    setBlockedUsers((prev) => {
-      const next = new Set(prev);
-      next.delete(userId);
-      return next;
-    });
-    setUnblockConfirmUserId(null);
-  };
-
-  const blockConfirmTarget = blockConfirmUserId !== null
-    ? mockUsers.find((u) => u.id === blockConfirmUserId)
-    : null;
-
-  const unblockConfirmTarget = unblockConfirmUserId !== null
-    ? mockUsers.find((u) => u.id === unblockConfirmUserId)
-    : null;
 
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900">Users Management</h1>
-        <p className="text-gray-500 mt-1">Manage and view all registered users</p>
+        <p className="text-gray-500 mt-1">Search, filter, and manage all registered users.</p>
       </div>
 
-      {/* Search & Filter bar */}
       <div className="bg-[#F9FAFB] rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 xl:flex-row">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Quick search by name, location, profession..."
+              placeholder="Quick search by first name, last name, email, or codename..."
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#415192] focus:border-transparent"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#415192] focus:border-transparent"
             />
           </div>
 
-          {/* Clear applied filters badge */}
-          {activeCount > 0 && (
-            <button
-              onClick={clearApplied}
-              className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Clear filters
-            </button>
-          )}
-
-          <button
-            onClick={openModal}
-            className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${
-              activeCount > 0
-                ? "border-[#415192] bg-[#415192]/5 text-[#415192]"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            Filters
+          <div className="flex gap-3">
             {activeCount > 0 && (
-              <span className="bg-[#415192] text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
-                {activeCount}
-              </span>
+              <button
+                onClick={clearApplied}
+                className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Clear filters
+              </button>
             )}
-          </button>
+
+            <button
+              onClick={openModal}
+              className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${
+                activeCount > 0
+                  ? "border-[#415192] bg-[#415192]/5 text-[#415192]"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Advanced Filters
+              {activeCount > 0 && (
+                <span className="bg-[#415192] text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Users Table */}
       <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Religion</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No users found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                paginatedUsers.map((user) => {
-                  const isBlocked = blockedUsers.has(user.id);
-                  return (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-[#415192] flex items-center justify-center text-white shrink-0">
-                            {user.name.charAt(0)}
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.gender}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.age}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.location}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.religion}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            isBlocked
-                              ? "bg-red-100 text-red-700"
-                              : user.status === "Active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {isBlocked ? "Blocked" : user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-[60px]">
-                            <div
-                              className="bg-[#415192] h-2 rounded-full"
-                              style={{ width: `${user.completion}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-500">{user.completion}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/users/${user.id}`}
-                            title="View user"
-                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            <Eye className="w-4 h-4 text-gray-600" />
-                          </Link>
-                          {isBlocked ? (
-                            <button
-                              title="Unblock user"
-                              onClick={() => setUnblockConfirmUserId(user.id)}
-                              className="p-1.5 hover:bg-green-50 rounded transition-colors"
-                            >
-                              <ShieldCheck className="w-4 h-4 text-green-600" />
-                            </button>
-                          ) : (
-                            <button
-                              title="Block user"
-                              onClick={() => setBlockConfirmUserId(user.id)}
-                              className="p-1.5 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Ban className="w-4 h-4 text-gray-600 hover:text-red-500" />
-                            </button>
-                          )}
-                        </div>
+        {loading ? (
+          <div className="p-8 text-sm text-gray-500 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-[#415192]" />
+            Loading users...
+          </div>
+        ) : error ? (
+          <div className="p-8 text-sm text-red-700 flex items-start gap-3 bg-red-50">
+            <X className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Could not load users</p>
+              <p className="mt-1">{error}</p>
+              <button
+                onClick={() => setReloadIndex((prev) => prev + 1)}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#415192] shadow-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm text-gray-600">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
+                  <tr>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Codename</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Age</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Sect</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Verified</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-10 text-center text-sm text-gray-400">
+                        No users found.
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ) : (
+                    users.map((user) => {
+                      const isBlocked = !user.is_active;
+                      const actionLabel = isBlocked ? "Unblock" : "Block";
 
-        <TablePagination
-          totalItems={filteredUsers.length}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-          itemLabel="users"
-        />
+                      return (
+                        <tr key={user.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-[#415192] text-white flex items-center justify-center text-sm font-semibold overflow-hidden shrink-0">
+                                {user.profile_picture ? (
+                                  <img
+                                    src={user.profile_picture}
+                                    alt={formatName(user)}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{initialsFor(user)}</span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{formatName(user)}</p>
+                                <p className="text-xs text-gray-500">{user.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600">{user.codename ?? "—"}</td>
+                          <td className="px-4 py-4 text-gray-600">{formatRole(user.role)}</td>
+                          <td className="px-4 py-4 text-gray-600">{displayValue(user.age)}</td>
+                          <td className="px-4 py-4 text-gray-600">
+                            <div>
+                              <p>{displayValue(user.city)}</p>
+                              <p className="text-xs text-gray-400">{displayValue(user.country)}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600">{displayValue(user.sect)}</td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                                user.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {user.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 capitalize">
+                              {displayValue(user.subscription_plan)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                                user.is_verified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {user.is_verified ? (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              ) : (
+                                <X className="w-3.5 h-3.5" />
+                              )}
+                              {formatBool(user.is_verified)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-4">
+                              <Link
+                                to={`/users/${user.id}`}
+                                aria-label="View user"
+                                title="View user"
+                                className="inline-flex items-center justify-center text-gray-700 transition-colors hover:text-[#415192]"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Link>
+                              <button
+                                aria-label={actionLabel}
+                                title={actionLabel}
+                                onClick={() => {
+                                  setBlockTarget(user);
+                                  setBlockAction(isBlocked ? "unblock" : "block");
+                                }}
+                                className={`inline-flex items-center justify-center transition-colors ${
+                                  isBlocked
+                                    ? "text-green-700 hover:text-green-800"
+                                    : "text-red-600 hover:text-red-700"
+                                }`}
+                              >
+                                {isBlocked ? (
+                                  <ShieldCheck className="w-4 h-4" />
+                                ) : (
+                                  <Ban className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <TablePagination
+              totalItems={totalCount}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              itemLabel="users"
+            />
+          </>
+        )}
       </div>
 
-      {/* ── Advanced Filter Modal ──────────────────────────────────────────── */}
       {showFilterModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-
-            {/* Modal Header */}
+          <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[#415192]/10 flex items-center justify-center">
@@ -391,7 +666,7 @@ export function Users() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Advanced Filters</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Narrow down users by specific criteria</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Apply backend filters from the admin users API.</p>
                 </div>
               </div>
               <button
@@ -402,195 +677,309 @@ export function Users() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="overflow-y-auto p-6 flex-1 space-y-6">
-
-              {/* Section: Search */}
               <div>
-                <SectionLabel>Search</SectionLabel>
-                <div className="grid grid-cols-3 gap-4">
-                  <FIn
-                    label="Name"
-                    value={draft.name}
-                    onChange={(v) => setDraftField("name", v)}
-                    placeholder="Search by name"
+                <SectionLabel>Core</SectionLabel>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SelectField
+                    label="Role"
+                    value={draft.role}
+                    onChange={(value) => setDraftField("role", value)}
+                    options={ROLE_OPTIONS}
                   />
-                  <FIn
-                    label="Code"
-                    value={draft.code}
-                    onChange={(v) => setDraftField("code", v)}
-                    placeholder="Search by code"
-                  />
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-100" />
-
-              {/* Section: Demographics */}
-              <div>
-                <SectionLabel>Demographics</SectionLabel>
-                <div className="grid grid-cols-3 gap-4">
-                  <FSel
+                  <SelectField
                     label="Gender"
                     value={draft.gender}
-                    onChange={(v) => setDraftField("gender", v)}
+                    onChange={(value) => setDraftField("gender", value)}
                     options={GENDER_OPTIONS}
                   />
-                  {/* Age range — two inputs within one cell */}
-                  <FL label="Age Range">
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Min"
-                        value={draft.ageMin}
-                        onChange={(e) => setDraftField("ageMin", e.target.value)}
-                        className={fieldClass}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Max"
-                        value={draft.ageMax}
-                        onChange={(e) => setDraftField("ageMax", e.target.value)}
-                        className={fieldClass}
-                      />
-                    </div>
-                  </FL>
-                  <FSel
-                    label="Verification"
-                    value={draft.verification}
-                    onChange={(v) => setDraftField("verification", v)}
-                    options={VERIFICATION_OPTIONS}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <FSel
-                    label="Marital Status"
-                    value={draft.maritalStatus}
-                    onChange={(v) => setDraftField("maritalStatus", v)}
-                    options={MARITAL_STATUS_OPTIONS}
-                  />
-                  <FIn
-                    label="Location"
-                    value={draft.location}
-                    onChange={(v) => setDraftField("location", v)}
-                    placeholder="e.g. London, UK"
-                  />
-                  <FSel
-                    label="Ethnicity"
-                    value={draft.ethnicity}
-                    onChange={(v) => setDraftField("ethnicity", v)}
-                    options={ETHNICITY_OPTIONS}
-                  />
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-100" />
-
-              {/* Section: Personal */}
-              <div>
-                <SectionLabel>Personal</SectionLabel>
-                <div className="grid grid-cols-3 gap-4">
-                  <FSel
-                    label="Nationality"
-                    value={draft.nationality}
-                    onChange={(v) => setDraftField("nationality", v)}
-                    options={NATIONALITY_OPTIONS}
-                  />
-                  <FSel
-                    label="Employment"
-                    value={draft.employment}
-                    onChange={(v) => setDraftField("employment", v)}
-                    options={EMPLOYMENT_OPTIONS}
-                  />
-                  <FIn
-                    label="Height"
-                    value={draft.height}
-                    onChange={(v) => setDraftField("height", v)}
-                    placeholder={`e.g. 5'6"`}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <FIn
-                    label="Weight"
-                    value={draft.weight}
-                    onChange={(v) => setDraftField("weight", v)}
-                    placeholder="e.g. 70kg"
-                  />
-                  <FSel
-                    label="How do you dress?"
-                    value={draft.dress}
-                    onChange={(v) => setDraftField("dress", v)}
-                    options={DRESS_OPTIONS}
-                  />
-                  <FSel
-                    label="Pray 5x a day?"
-                    value={draft.pray}
-                    onChange={(v) => setDraftField("pray", v)}
-                    options={PRAY_OPTIONS}
-                  />
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-100" />
-
-              {/* Section: Account */}
-              <div>
-                <SectionLabel>Account</SectionLabel>
-                <div className="grid grid-cols-3 gap-4">
-                  <FSel
-                    label="Do you have children?"
-                    value={draft.children}
-                    onChange={(v) => setDraftField("children", v)}
-                    options={CHILDREN_OPTIONS}
-                  />
-                  <FSel
-                    label="How did you find us?"
-                    value={draft.howFound}
-                    onChange={(v) => setDraftField("howFound", v)}
-                    options={HOW_FOUND_OPTIONS}
-                  />
-                  <FSel
-                    label="Subscription type"
-                    value={draft.subscription}
-                    onChange={(v) => setDraftField("subscription", v)}
+                  <SelectField
+                    label="Subscription Plan"
+                    value={draft.subscription_plan}
+                    onChange={(value) => setDraftField("subscription_plan", value)}
                     options={SUBSCRIPTION_OPTIONS}
                   />
+                  <SelectField
+                    label="Active Status"
+                    value={draft.is_active}
+                    onChange={(value) => setDraftField("is_active", value as TriState)}
+                    options={BOOLEAN_OPTIONS}
+                  />
+                  <SelectField
+                    label="Verified"
+                    value={draft.is_verified}
+                    onChange={(value) => setDraftField("is_verified", value as TriState)}
+                    options={BOOLEAN_OPTIONS}
+                  />
+                  <SelectField
+                    label="Ordering"
+                    value={draft.ordering}
+                    onChange={(value) => setDraftField("ordering", value)}
+                    options={[{ label: "Default", value: "" }, ...ORDERING_OPTIONS]}
+                  />
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-gray-100" />
 
-              {/* Section: Partner Preferences */}
               <div>
-                <SectionLabel>Partner Preferences</SectionLabel>
-                <div className="grid grid-cols-3 gap-4">
-                  <FIn
-                    label="Preferred age range"
-                    value={draft.prefAgeRange}
-                    onChange={(v) => setDraftField("prefAgeRange", v)}
-                    placeholder="e.g. 28 - 35"
+                <SectionLabel>Identity</SectionLabel>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <TextField
+                    label="Age"
+                    value={draft.age}
+                    onChange={(value) => setDraftField("age", value)}
+                    type="number"
                   />
-                  <FSel
-                    label="Preferred ethnicity"
-                    value={draft.prefEthnicity}
-                    onChange={(v) => setDraftField("prefEthnicity", v)}
-                    options={ETHNICITY_OPTIONS}
+                  <TextField
+                    label="Date of Birth"
+                    value={draft.date_of_birth}
+                    onChange={(value) => setDraftField("date_of_birth", value)}
+                    type="date"
                   />
-                  <FSel
-                    label="Preferred marital status"
-                    value={draft.prefMaritalStatus}
-                    onChange={(v) => setDraftField("prefMaritalStatus", v)}
-                    options={MARITAL_STATUS_OPTIONS}
+                  <TextField
+                    label="City"
+                    value={draft.city}
+                    onChange={(value) => setDraftField("city", value)}
+                    placeholder="City"
+                  />
+                  <TextField
+                    label="Country"
+                    value={draft.country}
+                    onChange={(value) => setDraftField("country", value)}
+                    placeholder="Country"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100" />
+
+              <div>
+                <SectionLabel>Profile</SectionLabel>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SelectField
+                    label="Sect"
+                    value={draft.sect}
+                    onChange={(value) => setDraftField("sect", value)}
+                    options={[{ label: "All", value: "" }, ...SECT_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Marital Status"
+                    value={draft.marital_status}
+                    onChange={(value) => setDraftField("marital_status", value)}
+                    options={[{ label: "All", value: "" }, ...MARITAL_STATUS_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Children Count"
+                    value={draft.children_count}
+                    onChange={(value) => setDraftField("children_count", value)}
+                    options={[
+                      { label: "All", value: "" },
+                      ...CHILDREN_COUNT_OPTIONS.map((value) => ({ label: value, value })),
+                    ]}
+                  />
+                  <SelectField
+                    label="Has Children"
+                    value={draft.has_children}
+                    onChange={(value) => setDraftField("has_children", value as TriState)}
+                    options={BOOLEAN_OPTIONS}
+                  />
+                  <TextField
+                    label="Height"
+                    value={draft.height}
+                    onChange={(value) => setDraftField("height", value)}
+                    placeholder="e.g. 5'10 or 178 cm"
+                  />
+                  <TextField
+                    label="Weight"
+                    value={draft.weight}
+                    onChange={(value) => setDraftField("weight", value)}
+                    placeholder="e.g. 70kg"
+                  />
+                  <SelectField
+                    label="Pray 5x"
+                    value={draft.pray_5x}
+                    onChange={(value) => setDraftField("pray_5x", value)}
+                    options={[{ label: "All", value: "" }, ...PRAY_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Open to Relocate"
+                    value={draft.open_to_relocate}
+                    onChange={(value) => setDraftField("open_to_relocate", value)}
+                    options={[{ label: "All", value: "" }, ...RELOCATION_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <TextField
+                    label="Relocate Details"
+                    value={draft.open_to_relocate_details}
+                    onChange={(value) => setDraftField("open_to_relocate_details", value)}
+                    placeholder="Details"
+                  />
+                  <TextField
+                    label="Employment"
+                    value={draft.employment}
+                    onChange={(value) => setDraftField("employment", value)}
+                    placeholder="Employment"
+                  />
+                  <SelectField
+                    label="Education"
+                    value={draft.education}
+                    onChange={(value) => setDraftField("education", value)}
+                    options={[{ label: "All", value: "" }, ...EDUCATION_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Income"
+                    value={draft.income}
+                    onChange={(value) => setDraftField("income", value)}
+                    options={[{ label: "All", value: "" }, ...INCOME_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Frame"
+                    value={draft.frame}
+                    onChange={(value) => setDraftField("frame", value)}
+                    options={[{ label: "All", value: "" }, ...FRAME_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Languages Spoken"
+                    value={draft.languages_spoken}
+                    onChange={(value) => setDraftField("languages_spoken", value)}
+                    options={[{ label: "All", value: "" }, ...LANGUAGE_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="How Found"
+                    value={draft.how_found}
+                    onChange={(value) => setDraftField("how_found", value)}
+                    options={[{ label: "All", value: "" }, ...HOW_FOUND_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Nationality"
+                    value={draft.nationality}
+                    onChange={(value) => setDraftField("nationality", value)}
+                    options={[{ label: "All", value: "" }, ...NATIONALITY_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Ethnicity"
+                    value={draft.ethnicity}
+                    onChange={(value) => setDraftField("ethnicity", value)}
+                    options={[{ label: "All", value: "" }, ...ETHNICITY_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <TextField
+                    label="Health Concerns"
+                    value={draft.health_concerns}
+                    onChange={(value) => setDraftField("health_concerns", value)}
+                    placeholder="Health concerns"
+                  />
+                  <TextField
+                    label="Other Preferences"
+                    value={draft.other_preferences}
+                    onChange={(value) => setDraftField("other_preferences", value)}
+                    placeholder="Other preferences"
+                  />
+                  <TextField
+                    label="Relationship With Islam"
+                    value={draft.relationship_with_islam}
+                    onChange={(value) => setDraftField("relationship_with_islam", value)}
+                    placeholder="Relationship with Islam"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100" />
+
+              <div>
+                <SectionLabel>Preferences</SectionLabel>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <TextField
+                    label="Preferred Age Min"
+                    value={draft.pref_age_min}
+                    onChange={(value) => setDraftField("pref_age_min", value)}
+                    type="number"
+                  />
+                  <TextField
+                    label="Preferred Age Max"
+                    value={draft.pref_age_max}
+                    onChange={(value) => setDraftField("pref_age_max", value)}
+                    type="number"
+                  />
+                  <TextField
+                    label="Preferred Country"
+                    value={draft.pref_country_of_residence}
+                    onChange={(value) => setDraftField("pref_country_of_residence", value)}
+                    placeholder="Preferred country"
+                  />
+                  <SelectField
+                    label="Preferred Ethnicity"
+                    value={draft.pref_ethnicity}
+                    onChange={(value) => setDraftField("pref_ethnicity", value)}
+                    options={[{ label: "All", value: "" }, ...ETHNICITY_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <SelectField
+                    label="Preferred Marital Status"
+                    value={draft.pref_marital_status}
+                    onChange={(value) => setDraftField("pref_marital_status", value)}
+                    options={[{ label: "All", value: "" }, ...MARITAL_STATUS_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  {/*
+                  <TextField
+                    label="Envision Marriage"
+                    value={draft.envision_marriage}
+                    onChange={(value) => setDraftField("envision_marriage", value)}
+                    placeholder="Envision marriage"
+                  />
+                  <TextField
+                    label="Envision Spouse"
+                    value={draft.envision_spouse}
+                    onChange={(value) => setDraftField("envision_spouse", value)}
+                    placeholder="Envision spouse"
+                  />
+                  <TextField
+                    label="Role As Spouse"
+                    value={draft.role_as_spouse}
+                    onChange={(value) => setDraftField("role_as_spouse", value)}
+                    placeholder="Role as spouse"
+                  />
+                  <TextField
+                    label="Spouse Religious Status"
+                    value={draft.spouse_religious_status_pref}
+                    onChange={(value) => setDraftField("spouse_religious_status_pref", value)}
+                    placeholder="Spouse religious status"
+                  />
+                  */}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100" />
+
+              <div>
+                <SectionLabel>Wali</SectionLabel>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SelectField
+                    label="Wali Profile Gender"
+                    value={draft.wali_profile_gender}
+                    onChange={(value) => setDraftField("wali_profile_gender", value)}
+                    options={GENDER_OPTIONS}
+                  />
+                  <SelectField
+                    label="Wali Profile How Found"
+                    value={draft.wali_profile_how_found}
+                    onChange={(value) => setDraftField("wali_profile_how_found", value)}
+                    options={[{ label: "All", value: "" }, ...HOW_FOUND_OPTIONS.map((value) => ({ label: value, value }))]}
+                  />
+                  <TextField
+                    label="Wali Phone"
+                    value={draft.wali_profile_phone}
+                    onChange={(value) => setDraftField("wali_profile_phone", value)}
+                    placeholder="Phone"
+                  />
+                  <TextField
+                    label="Relation to Sister"
+                    value={draft.wali_profile_relation_to_sister}
+                    onChange={(value) => setDraftField("wali_profile_relation_to_sister", value)}
+                    placeholder="Relation to sister"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 shrink-0">
               <button
                 onClick={clearDraft}
@@ -610,9 +999,9 @@ export function Users() {
                   className="px-5 py-2 bg-[#415192] text-white rounded-lg text-sm font-medium hover:bg-[#354177] transition-colors"
                 >
                   Apply Filters
-                  {Object.values(draft).filter((v) => v !== "").length > 0 && (
+                  {Object.values(draft).filter((value) => value !== "").length > 0 && (
                     <span className="ml-2 bg-white/20 text-white text-[11px] font-bold rounded-full px-1.5 py-0.5">
-                      {Object.values(draft).filter((v) => v !== "").length}
+                      {Object.values(draft).filter((value) => value !== "").length}
                     </span>
                   )}
                 </button>
@@ -622,60 +1011,51 @@ export function Users() {
         </div>
       )}
 
-      {/* ── Unblock Confirmation Modal ─────────────────────────────────────── */}
-      {unblockConfirmUserId !== null && unblockConfirmTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
-              <ShieldCheck className="w-6 h-6 text-green-600" />
+      {blockTarget && blockAction && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div
+                className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${
+                  blockAction === "block" ? "bg-red-100" : "bg-green-100"
+                }`}
+              >
+                {blockAction === "block" ? (
+                  <Ban className="w-7 h-7 text-red-600" />
+                ) : (
+                  <ShieldCheck className="w-7 h-7 text-green-600" />
+                )}
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {blockAction === "block" ? "Block this user?" : "Unblock this user?"}
+              </h3>
+              <p className="text-sm text-gray-500 mt-2">
+                <span className="font-medium text-gray-700">{formatName(blockTarget)}</span>
+                {blockAction === "block"
+                  ? " will be temporarily blocked from using the platform."
+                  : " will regain access to the platform."}
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">Unblock User</h3>
-            <p className="text-sm text-gray-500 text-center mb-6">
-              <span className="font-medium text-gray-700">{unblockConfirmTarget.name}</span> will
-              regain full access to the platform.
-            </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setUnblockConfirmUserId(null)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => {
+                  setBlockTarget(null);
+                  setBlockAction(null);
+                }}
+                disabled={blockSaving}
+                className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                onClick={() => confirmUnblockUser(unblockConfirmUserId)}
-                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                onClick={handleBlockAction}
+                disabled={blockSaving}
+                className={`flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
+                  blockAction === "block" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+                }`}
               >
-                Unblock User
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Block Confirmation Modal ───────────────────────────────────────── */}
-      {blockConfirmUserId !== null && blockConfirmTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
-              <Ban className="w-6 h-6 text-red-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">Block User</h3>
-            <p className="text-sm text-gray-500 text-center mb-6">
-              <span className="font-medium text-gray-700">{blockConfirmTarget.name}</span> will be
-              temporarily blocked from using the platform. You can unblock them at any time.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setBlockConfirmUserId(null)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => confirmBlockUser(blockConfirmUserId)}
-                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-              >
-                Block User
+                {blockSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {blockAction === "block" ? "Block User" : "Unblock User"}
               </button>
             </div>
           </div>
