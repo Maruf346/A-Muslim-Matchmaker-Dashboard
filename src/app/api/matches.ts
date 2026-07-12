@@ -66,6 +66,8 @@ export interface AdminMatchesListParams {
   ordering?: string;
   page?: number;
   page_size?: number;
+  photos_revealed?: boolean;
+  recent?: boolean;
   search?: string;
   start_date?: string;
   status?: AdminMatchStatus;
@@ -74,7 +76,7 @@ export interface AdminMatchesListParams {
 export function listMatches(params: AdminMatchesListParams = {}) {
   const searchParams = new URLSearchParams();
 
-  const append = (key: string, value: string | number | null | undefined) => {
+  const append = (key: string, value: string | number | boolean | null | undefined) => {
     if (value === undefined || value === null || value === "") return;
     searchParams.set(key, String(value));
   };
@@ -83,6 +85,8 @@ export function listMatches(params: AdminMatchesListParams = {}) {
   append("ordering", params.ordering);
   append("page", params.page);
   append("page_size", params.page_size);
+  append("photos_revealed", params.photos_revealed);
+  append("recent", params.recent);
   append("search", params.search);
   append("start_date", params.start_date);
   append("status", params.status);
