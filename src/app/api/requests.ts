@@ -45,6 +45,10 @@ export interface MatchmakingRequestListResponse {
   results: MatchmakingRequest[];
 }
 
+export type MatchmakingRequestListApiResponse =
+  | MatchmakingRequestListResponse
+  | MatchmakingRequest[];
+
 export interface MatchmakingRequestListParams {
   end_date?: string;
   ordering?: string;
@@ -73,7 +77,7 @@ export function listMatchmakingRequests(params: MatchmakingRequestListParams = {
 
   const query = searchParams.toString();
 
-  return apiRequest<MatchmakingRequestListResponse | null>(
+  return apiRequest<MatchmakingRequestListApiResponse | null>(
     `matchmaking/admin/requests/${query ? `?${query}` : ""}`,
     {
       method: "GET",

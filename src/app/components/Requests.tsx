@@ -3,6 +3,7 @@ import { CheckCircle, XCircle, Clock, Search, Filter, Check, X, Loader2 } from "
 import { TablePagination } from "./ui/TablePagination";
 import {
   listMatchmakingRequests,
+  type MatchmakingRequestListApiResponse,
   reviewMatchmakingRequest,
   type MatchmakingRequest,
   type MatchmakingRequestStatus,
@@ -62,6 +63,27 @@ function isValidRequestListResponse(
   response: unknown,
 ): response is { count?: number | null; results?: MatchmakingRequest[] | null } {
   return Boolean(response) && typeof response === "object";
+}
+
+function normalizeRequestListResponse(response: MatchmakingRequestListApiResponse | null) {
+  if (Array.isArray(response)) {
+    return {
+      results: response,
+      count: response.length,
+    };
+  }
+
+  if (isValidRequestListResponse(response)) {
+    return {
+      results: Array.isArray(response.results) ? response.results : [],
+      count: typeof response.count === "number" ? response.count : 0,
+    };
+  }
+
+  return {
+    results: [] as MatchmakingRequest[],
+    count: 0,
+  };
 }
 
 export function Requests() {
@@ -126,12 +148,7 @@ export function Requests() {
 
         if (cancelled) return;
 
-        const normalizedResults = isValidRequestListResponse(response) && Array.isArray(response.results)
-          ? response.results
-          : [];
-        const normalizedCount = isValidRequestListResponse(response) && typeof response.count === "number"
-          ? response.count
-          : 0;
+        const { results: normalizedResults, count: normalizedCount } = normalizeRequestListResponse(response);
 
         if (normalizedResults.length === 0 && normalizedCount > 0 && currentPage > 1) {
           setCurrentPage((prev) => Math.max(1, prev - 1));
@@ -443,7 +460,7 @@ export function Requests() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-gray-900 truncate">{formatUserName(req)}</p>
-                                <p className="text-xs text-gray-500 truncate">{req.user.email || "No email available"}</p>
+                                {/* <p className="text-xs text-gray-500 truncate">{req.user.email || "No email available"}</p> */}
                               </div>
                             </div>
                           </td>
