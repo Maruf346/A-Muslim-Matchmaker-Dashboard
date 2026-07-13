@@ -1,17 +1,24 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Heart, MapPin, Briefcase, Search, ChevronDown, Users, Check, X } from "lucide-react";
-import { mockUsers, type UserData } from "../data/mockUsers";
 import { TablePagination } from "./ui/TablePagination";
-
-const MALE_COUNT   = mockUsers.filter((u) => u.gender === "Male").length;
-const FEMALE_COUNT = mockUsers.filter((u) => u.gender === "Female").length;
+import {
+  createPrivateMatchSuggestion,
+  listPrivateMatchmakingClients,
+  listPrivateMatchmakingProspects,
+  type PaginatedResponse,
+  type PrivateMatchSuggestionParty,
+  type PrivateMatchmakingClient,
+  type PrivateMatchmakingGenderFilter,
+  type PrivateMatchmakingProspect,
+} from "../api/privateMatchmaking";
+import { ApiError } from "../api/errors";
 
 type GenderFilter = "" | "Male" | "Female";
 
 const FLOATING_HEARTS = [
-  { left: "5%",  dur: "1.8s", delay: "0.1s" },
+  { left: "5%", dur: "1.8s", delay: "0.1s" },
   { left: "15%", dur: "2.1s", delay: "0.4s" },
-  { left: "28%", dur: "1.6s", delay: "0s"   },
+  { left: "28%", dur: "1.6s", delay: "0s" },
   { left: "42%", dur: "2.3s", delay: "0.2s" },
   { left: "55%", dur: "1.9s", delay: "0.6s" },
   { left: "68%", dur: "1.7s", delay: "0.3s" },
@@ -20,16 +27,70 @@ const FLOATING_HEARTS = [
 ];
 
 interface MatchSuccessModalProps {
-  first: UserData;
-  second: UserData;
+  first: PrivateMatchSuggestionParty;
+  second: PrivateMatchSuggestionParty;
   onClose: () => void;
 }
 
+function getDisplayName(person: {
+  codename: string | null;
+  first_name: string;
+  last_name: string;
+}) {
+  return `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || person.codename || "Unnamed profile";
+}
+
+function getLocation(person: { city: string | null; country: string | null }) {
+  const parts = [person.city, person.country].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "-";
+}
+
+function formatSecondaryLine(person: { role: string; sect?: string | null }) {
+  const parts = [person.role, person.sect].filter(Boolean).map((value) => String(value));
+  if (parts.length === 0) return "-";
+
+  return parts
+    .map((value) => value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " "))
+    .join(" • ");
+}
+
+function formatRole(value: string | null | undefined) {
+  if (!value) return "-";
+  return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
+}
+
+function isPaginatedResponse<T>(value: unknown): value is PaginatedResponse<T> {
+  return Boolean(value) && typeof value === "object" && "results" in (value as Record<string, unknown>);
+}
+
+function normalizeListResponse<T>(value: PaginatedResponse<T> | T[] | null) {
+  if (Array.isArray(value)) {
+    return {
+      results: value,
+      count: value.length,
+    };
+  }
+
+  if (isPaginatedResponse<T>(value)) {
+    return {
+      results: Array.isArray(value.results) ? value.results : [],
+      count: typeof value.count === "number" ? value.count : 0,
+    };
+  }
+
+  return {
+    results: [] as T[],
+    count: 0,
+  };
+}
+
 function MatchSuccessModal({ first, second, onClose }: MatchSuccessModalProps) {
-  const firstColor  = first.gender  === "Male" ? "#415192" : "#D07C84";
-  const secondColor = second.gender === "Male" ? "#415192" : "#D07C84";
-  const firstRing   = first.gender  === "Male" ? "#ACB5DA" : "#ECCBCE";
-  const secondRing  = second.gender === "Male" ? "#ACB5DA" : "#ECCBCE";
+  const firstColor = first.gender === "male" ? "#415192" : "#D07C84";
+  const secondColor = second.gender === "male" ? "#415192" : "#D07C84";
+  const firstRing = first.gender === "male" ? "#ACB5DA" : "#ECCBCE";
+  const secondRing = second.gender === "male" ? "#ACB5DA" : "#ECCBCE";
+  const firstName = getDisplayName(first);
+  const secondName = getDisplayName(second);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
@@ -56,40 +117,34 @@ function MatchSuccessModal({ first, second, onClose }: MatchSuccessModalProps) {
         .mm-float       { animation: floatHeart var(--dur) ease-out var(--delay) forwards; }
       `}</style>
 
-      {/* Backdrop */}
       <div className="mm-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Card */}
       <div className="mm-modal relative bg-white rounded-3xl px-8 pt-8 pb-7 max-w-sm w-full mx-4 shadow-2xl overflow-hidden">
-
-        {/* Floating hearts */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {FLOATING_HEARTS.map((h, i) => (
+          {FLOATING_HEARTS.map((heart, index) => (
             <span
-              key={i}
+              key={index}
               className="mm-float absolute bottom-4 text-xl text-[#D07C84]"
-              style={{ left: h.left, "--dur": h.dur, "--delay": h.delay } as React.CSSProperties}
+              style={{ left: heart.left, "--dur": heart.dur, "--delay": heart.delay } as CSSProperties}
             >
               ♥
             </span>
           ))}
         </div>
 
-        {/* Pulsing heart icon */}
         <div className="mm-heart-pulse w-20 h-20 bg-gradient-to-br from-[#D07C84] to-[#ECCBCE] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
           <Heart className="w-10 h-10 text-white fill-white" />
         </div>
 
-        {/* Matched avatars */}
         <div className="flex items-center justify-center gap-5 mb-5">
           <div className="text-center">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold mx-auto mb-1.5 ring-2"
               style={{ backgroundColor: firstColor, outline: `2px solid ${firstRing}`, outlineOffset: "2px" }}
             >
-              {first.name.charAt(0)}
+              {firstName.charAt(0)}
             </div>
-            <p className="text-sm font-medium text-gray-700">{first.name.split(" ")[0]}</p>
+            <p className="text-sm font-medium text-gray-700">{firstName.split(" ")[0]}</p>
           </div>
 
           <div className="flex flex-col items-center gap-1 pb-5">
@@ -102,17 +157,17 @@ function MatchSuccessModal({ first, second, onClose }: MatchSuccessModalProps) {
               className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold mx-auto mb-1.5"
               style={{ backgroundColor: secondColor, outline: `2px solid ${secondRing}`, outlineOffset: "2px" }}
             >
-              {second.name.charAt(0)}
+              {secondName.charAt(0)}
             </div>
-            <p className="text-sm font-medium text-gray-700">{second.name.split(" ")[0]}</p>
+            <p className="text-sm font-medium text-gray-700">{secondName.split(" ")[0]}</p>
           </div>
         </div>
 
         <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Match Generated!</h3>
         <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
-          <span className="font-medium text-gray-700">{first.name}</span>
+          <span className="font-medium text-gray-700">{firstName}</span>
           {" & "}
-          <span className="font-medium text-gray-700">{second.name}</span>
+          <span className="font-medium text-gray-700">{secondName}</span>
           {" "}have been successfully matched.{" "}
           May this be the beginning of something beautiful.
         </p>
@@ -143,59 +198,209 @@ export function Matchmaking() {
   const [requestedGender, setRequestedGender] = useState<GenderFilter>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedLeft,  setSelectedLeft]  = useState<number | null>(null);
-  const [selectedRight, setSelectedRight] = useState<number | null>(null);
-  const [matchSuccess, setMatchSuccess] = useState<{ first: UserData; second: UserData } | null>(null);
+
+  const [selectedLeft, setSelectedLeft] = useState<PrivateMatchmakingClient | null>(null);
+  const [selectedRight, setSelectedRight] = useState<PrivateMatchmakingProspect | null>(null);
+  const [matchSuccess, setMatchSuccess] = useState<{ first: PrivateMatchSuggestionParty; second: PrivateMatchSuggestionParty } | null>(null);
+
+  const [leftSearch, setLeftSearch] = useState("");
+  const [rightSearch, setRightSearch] = useState("");
+  const [debouncedLeftSearch, setDebouncedLeftSearch] = useState("");
+  const [debouncedRightSearch, setDebouncedRightSearch] = useState("");
+
+  const [leftPage, setLeftPage] = useState(1);
+  const [leftPageSize, setLeftPageSize] = useState(8);
+  const [rightPage, setRightPage] = useState(1);
+  const [rightPageSize, setRightPageSize] = useState(8);
+
+  const [leftClients, setLeftClients] = useState<PrivateMatchmakingClient[]>([]);
+  const [rightProspects, setRightProspects] = useState<PrivateMatchmakingProspect[]>([]);
+  const [leftTotal, setLeftTotal] = useState(0);
+  const [rightTotal, setRightTotal] = useState(0);
+  const [maleCount, setMaleCount] = useState(0);
+  const [femaleCount, setFemaleCount] = useState(0);
+
+  const [loadingLeft, setLoadingLeft] = useState(false);
+  const [loadingRight, setLoadingRight] = useState(false);
+  const [creatingMatch, setCreatingMatch] = useState(false);
+  const [leftError, setLeftError] = useState<string | null>(null);
+  const [rightError, setRightError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+    const handler = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const [leftSearch,  setLeftSearch]  = useState("");
-  const [rightSearch, setRightSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedLeftSearch(leftSearch.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [leftSearch]);
 
-  const [leftPage,      setLeftPage]      = useState(1);
-  const [leftPageSize,  setLeftPageSize]  = useState(8);
-  const [rightPage,     setRightPage]     = useState(1);
-  const [rightPageSize, setRightPageSize] = useState(8);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedRightSearch(rightSearch.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [rightSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCounts = async () => {
+      try {
+        const [maleResponse, femaleResponse] = await Promise.all([
+          listPrivateMatchmakingClients({ gender: "male", page: 1, page_size: 1 }),
+          listPrivateMatchmakingClients({ gender: "female", page: 1, page_size: 1 }),
+        ]);
+
+        if (cancelled) return;
+
+        setMaleCount(normalizeListResponse(maleResponse).count);
+        setFemaleCount(normalizeListResponse(femaleResponse).count);
+      } catch {
+        if (cancelled) return;
+        setMaleCount(0);
+        setFemaleCount(0);
+      }
+    };
+
+    void loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const requestedGenderParam: PrivateMatchmakingGenderFilter | undefined =
+    requestedGender === "Male" ? "male" : requestedGender === "Female" ? "female" : undefined;
+
+  useEffect(() => {
+    if (!requestedGenderParam) {
+      setLeftClients([]);
+      setLeftTotal(0);
+      setLeftError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadClients = async () => {
+      setLoadingLeft(true);
+      setLeftError(null);
+
+      try {
+        const response = await listPrivateMatchmakingClients({
+          gender: requestedGenderParam,
+          page: leftPage,
+          page_size: leftPageSize,
+          search: debouncedLeftSearch || undefined,
+        });
+
+        if (cancelled) return;
+
+        const normalized = normalizeListResponse(response);
+        setLeftClients(normalized.results);
+        setLeftTotal(normalized.count);
+
+        if (normalized.results.length === 0 && normalized.count > 0 && leftPage > 1) {
+          setLeftPage((prev) => Math.max(1, prev - 1));
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setLeftError(error instanceof ApiError ? error.message : "Unable to load private clients.");
+        setLeftClients([]);
+        setLeftTotal(0);
+      } finally {
+        if (!cancelled) setLoadingLeft(false);
+      }
+    };
+
+    void loadClients();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedLeftSearch, leftPage, leftPageSize, requestedGenderParam]);
+
+  useEffect(() => {
+    if (!selectedLeft) {
+      setRightProspects([]);
+      setRightTotal(0);
+      setRightError(null);
+      setSelectedRight(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProspects = async () => {
+      setLoadingRight(true);
+      setRightError(null);
+
+      try {
+        const response = await listPrivateMatchmakingProspects({
+          private_client_id: selectedLeft.id,
+          page: rightPage,
+          page_size: rightPageSize,
+          search: debouncedRightSearch || undefined,
+        });
+
+        if (cancelled) return;
+
+        const normalized = normalizeListResponse(response);
+        setRightProspects(normalized.results);
+        setRightTotal(normalized.count);
+
+        if (normalized.results.length === 0 && normalized.count > 0 && rightPage > 1) {
+          setRightPage((prev) => Math.max(1, prev - 1));
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setRightError(error instanceof ApiError ? error.message : "Unable to load suggested profiles.");
+        setRightProspects([]);
+        setRightTotal(0);
+      } finally {
+        if (!cancelled) setLoadingRight(false);
+      }
+    };
+
+    void loadProspects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedRightSearch, rightPage, rightPageSize, selectedLeft]);
 
   const suggestedGender: GenderFilter =
     requestedGender === "Male" ? "Female" :
     requestedGender === "Female" ? "Male" : "";
 
-  const leftAccent  = requestedGender === "Female" ? "#D07C84" : "#415192";
-  const rightAccent = suggestedGender  === "Female" ? "#D07C84" : "#415192";
+  const leftAccent = requestedGender === "Female" ? "#D07C84" : "#415192";
+  const rightAccent = suggestedGender === "Female" ? "#D07C84" : "#415192";
 
-  const leftSelectedStyle  = requestedGender === "Female"
-    ? "border-[#D07C84] bg-[#ECCBCE]/30"
-    : "border-[#415192] bg-[#ACB5DA]/20";
-  const rightSelectedStyle = suggestedGender === "Female"
-    ? "border-[#D07C84] bg-[#ECCBCE]/30"
-    : "border-[#415192] bg-[#ACB5DA]/20";
+  const leftSelectedStyle =
+    requestedGender === "Female"
+      ? "border-[#D07C84] bg-[#ECCBCE]/30"
+      : "border-[#415192] bg-[#ACB5DA]/20";
+  const rightSelectedStyle =
+    suggestedGender === "Female"
+      ? "border-[#D07C84] bg-[#ECCBCE]/30"
+      : "border-[#415192] bg-[#ACB5DA]/20";
 
-  const allLeft  = requestedGender ? mockUsers.filter((u) => u.gender === requestedGender) : [];
-  const allRight = suggestedGender ? mockUsers.filter((u) => u.gender === suggestedGender) : [];
+  const leftProfile = useMemo(
+    () => (selectedLeft ? leftClients.find((profile) => profile.id === selectedLeft.id) ?? selectedLeft : null),
+    [leftClients, selectedLeft],
+  );
 
-  const filteredLeft = allLeft.filter((p) => {
-    if (!leftSearch) return true;
-    const t = leftSearch.toLowerCase();
-    return p.name.toLowerCase().includes(t) || p.location.toLowerCase().includes(t) || p.profession.toLowerCase().includes(t);
-  });
-
-  const filteredRight = allRight.filter((p) => {
-    if (!rightSearch) return true;
-    const t = rightSearch.toLowerCase();
-    return p.name.toLowerCase().includes(t) || p.location.toLowerCase().includes(t) || p.profession.toLowerCase().includes(t);
-  });
-
-  const paginatedLeft  = filteredLeft.slice((leftPage  - 1) * leftPageSize,  leftPage  * leftPageSize);
-  const paginatedRight = filteredRight.slice((rightPage - 1) * rightPageSize, rightPage * rightPageSize);
+  const rightProfile = useMemo(
+    () => (selectedRight ? rightProspects.find((profile) => profile.id === selectedRight.id) ?? selectedRight : null),
+    [rightProspects, selectedRight],
+  );
 
   const handleGenderChange = (gender: GenderFilter) => {
     setRequestedGender(gender);
@@ -203,51 +408,69 @@ export function Matchmaking() {
     setSelectedRight(null);
     setLeftSearch("");
     setRightSearch("");
+    setDebouncedLeftSearch("");
+    setDebouncedRightSearch("");
     setLeftPage(1);
     setRightPage(1);
+    setLeftClients([]);
+    setRightProspects([]);
+    setLeftTotal(0);
+    setRightTotal(0);
+    setLeftError(null);
+    setRightError(null);
+    setActionError(null);
   };
 
-  const handleCreateMatch = () => {
-    if (!selectedLeft || !selectedRight) return;
-    const first  = mockUsers.find((u) => u.id === selectedLeft);
-    const second = mockUsers.find((u) => u.id === selectedRight);
-    if (first && second) {
-      setMatchSuccess({ first, second });
+  const handleCreateMatch = async () => {
+    if (!leftProfile || !rightProfile || creatingMatch) return;
+
+    setCreatingMatch(true);
+    setActionError(null);
+
+    try {
+      const response = await createPrivateMatchSuggestion({
+        private_client_id: leftProfile.id,
+        prospect_id: rightProfile.id,
+      });
+
+      setMatchSuccess({
+        first: response.private_client,
+        second: response.prospect,
+      });
       setSelectedLeft(null);
       setSelectedRight(null);
+      setRightSearch("");
+      setDebouncedRightSearch("");
+      setRightPage(1);
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "Unable to create match.");
+    } finally {
+      setCreatingMatch(false);
     }
   };
 
-  const leftProfile  = allLeft.find((p)  => p.id === selectedLeft);
-  const rightProfile = allRight.find((p) => p.id === selectedRight);
-
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900">Private Matchmaking Panel</h1>
         <p className="text-gray-500 mt-1">Select profiles to create a new match</p>
       </div>
 
       <div className={`grid grid-cols-3 gap-6 ${requestedGender ? "items-start" : "items-stretch"}`}>
-
-        {/* ── Left: Requested Profiles ──────────────────────────────── */}
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 pb-4">
             <div className="flex items-center gap-2 mb-3 min-w-0">
               <h2 className="text-lg font-semibold text-gray-900 flex-1 min-w-0 truncate">Requested Profiles</h2>
 
-              {/* Gender dropdown */}
               <div className="relative shrink-0" ref={dropdownRef}>
-                {/* Trigger button */}
                 <button
-                  onClick={() => setDropdownOpen((o) => !o)}
+                  onClick={() => setDropdownOpen((open) => !open)}
                   className={`flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg text-xs font-semibold border transition-all shadow-sm whitespace-nowrap bg-white ${
                     requestedGender === "Male"
                       ? "text-[#415192] border-[#415192]"
                       : requestedGender === "Female"
-                      ? "text-[#D07C84] border-[#D07C84]"
-                      : "text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        ? "text-[#D07C84] border-[#D07C84]"
+                        : "text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                   }`}
                 >
                   {requestedGender ? (
@@ -263,13 +486,13 @@ export function Matchmaking() {
                   />
                 </button>
 
-                {/* Dropdown panel */}
                 {dropdownOpen && (
                   <div className="absolute top-full right-0 mt-1.5 w-44 bg-white border border-gray-100 rounded-xl shadow-xl shadow-gray-200/60 overflow-hidden z-30">
-
-                    {/* Male option */}
                     <button
-                      onClick={() => { handleGenderChange("Male"); setDropdownOpen(false); }}
+                      onClick={() => {
+                        handleGenderChange("Male");
+                        setDropdownOpen(false);
+                      }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors ${
                         requestedGender === "Male" ? "bg-[#415192]/5" : "hover:bg-gray-50"
                       }`}
@@ -279,7 +502,7 @@ export function Matchmaking() {
                       </div>
                       <div className="text-left flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-900">Male</p>
-                        <p className="text-[10px] text-gray-400">{MALE_COUNT} profiles</p>
+                        <p className="text-[10px] text-gray-400">{maleCount} profiles</p>
                       </div>
                       {requestedGender === "Male" && (
                         <div className="w-4 h-4 rounded-full bg-[#415192] flex items-center justify-center shrink-0">
@@ -290,9 +513,11 @@ export function Matchmaking() {
 
                     <div className="h-px bg-gray-100 mx-2.5" />
 
-                    {/* Female option */}
                     <button
-                      onClick={() => { handleGenderChange("Female"); setDropdownOpen(false); }}
+                      onClick={() => {
+                        handleGenderChange("Female");
+                        setDropdownOpen(false);
+                      }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors ${
                         requestedGender === "Female" ? "bg-[#D07C84]/5" : "hover:bg-gray-50"
                       }`}
@@ -302,7 +527,7 @@ export function Matchmaking() {
                       </div>
                       <div className="text-left flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-900">Female</p>
-                        <p className="text-[10px] text-gray-400">{FEMALE_COUNT} profiles</p>
+                        <p className="text-[10px] text-gray-400">{femaleCount} profiles</p>
                       </div>
                       {requestedGender === "Female" && (
                         <div className="w-4 h-4 rounded-full bg-[#D07C84] flex items-center justify-center shrink-0">
@@ -311,12 +536,14 @@ export function Matchmaking() {
                       )}
                     </button>
 
-                    {/* Clear option */}
                     {requestedGender && (
                       <>
                         <div className="h-px bg-gray-100 mx-2.5" />
                         <button
-                          onClick={() => { handleGenderChange(""); setDropdownOpen(false); }}
+                          onClick={() => {
+                            handleGenderChange("");
+                            setDropdownOpen(false);
+                          }}
                           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors text-gray-400 hover:text-gray-600"
                         >
                           <X className="w-3 h-3" />
@@ -336,7 +563,10 @@ export function Matchmaking() {
                   type="text"
                   placeholder="Search profiles..."
                   value={leftSearch}
-                  onChange={(e) => { setLeftSearch(e.target.value); setLeftPage(1); }}
+                  onChange={(event) => {
+                    setLeftSearch(event.target.value);
+                    setLeftPage(1);
+                  }}
                   className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#415192] focus:border-transparent"
                 />
               </div>
@@ -348,15 +578,19 @@ export function Matchmaking() {
           ) : (
             <>
               <div className="px-6 space-y-3 pb-4">
-                {paginatedLeft.length === 0 ? (
+                {loadingLeft ? (
+                  <p className="text-sm text-gray-400 text-center py-6">Loading profiles...</p>
+                ) : leftError ? (
+                  <p className="text-sm text-red-500 text-center py-6">{leftError}</p>
+                ) : leftClients.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-6">No profiles found.</p>
                 ) : (
-                  paginatedLeft.map((profile) => (
+                  leftClients.map((profile) => (
                     <div
                       key={profile.id}
-                      onClick={() => setSelectedLeft(profile.id)}
+                      onClick={() => setSelectedLeft(profile)}
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        selectedLeft === profile.id
+                        selectedLeft?.id === profile.id
                           ? leftSelectedStyle
                           : "border-gray-200 hover:border-gray-300 bg-white"
                       }`}
@@ -366,13 +600,13 @@ export function Matchmaking() {
                           className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-semibold shrink-0"
                           style={{ backgroundColor: leftAccent }}
                         >
-                          {profile.name.charAt(0)}
+                          {getDisplayName(profile).charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{profile.name}</p>
-                          <p className="text-xs text-gray-500">{profile.age} years</p>
+                          <p className="font-medium text-gray-900 truncate">{getDisplayName(profile)}</p>
+                          <p className="text-xs text-gray-500">{profile.age ?? "-"} years</p>
                         </div>
-                        {selectedLeft === profile.id && (
+                        {selectedLeft?.id === profile.id && (
                           <div
                             className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                             style={{ backgroundColor: leftAccent }}
@@ -384,11 +618,11 @@ export function Matchmaking() {
                       <div className="space-y-1 text-xs">
                         <div className="flex items-center gap-1.5 text-gray-600">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{profile.location}</span>
+                          <span className="truncate">{getLocation(profile)}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-gray-600">
-                          <Briefcase className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{profile.profession}</span>
+                          <Users className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{formatRole(profile.role)}</span>
                         </div>
                       </div>
                     </div>
@@ -396,20 +630,22 @@ export function Matchmaking() {
                 )}
               </div>
               <TablePagination
-                totalItems={filteredLeft.length}
+                totalItems={leftTotal}
                 currentPage={leftPage}
                 pageSize={leftPageSize}
                 onPageChange={setLeftPage}
-                onPageSizeChange={(size) => { setLeftPageSize(size); setLeftPage(1); }}
+                onPageSizeChange={(size) => {
+                  setLeftPageSize(size);
+                  setLeftPage(1);
+                }}
                 itemLabel="profiles"
               />
             </>
           )}
         </div>
 
-        {/* ── Centre: Match Preview ─────────────────────────────────── */}
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center min-h-[380px]">
-          {selectedLeft && selectedRight ? (
+          {leftProfile && rightProfile ? (
             <div className="text-center w-full">
               <div className="flex items-center justify-center gap-4 mb-6">
                 <div className="text-center">
@@ -417,10 +653,10 @@ export function Matchmaking() {
                     className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-semibold mx-auto mb-1"
                     style={{ backgroundColor: leftAccent }}
                   >
-                    {leftProfile?.name.charAt(0)}
+                    {getDisplayName(leftProfile).charAt(0)}
                   </div>
                   <p className="text-xs text-gray-500 max-w-[70px] truncate mx-auto">
-                    {leftProfile?.name.split(" ")[0]}
+                    {getDisplayName(leftProfile).split(" ")[0]}
                   </p>
                 </div>
                 <Heart className="w-8 h-8 text-[#D07C84] fill-[#D07C84]" />
@@ -429,26 +665,28 @@ export function Matchmaking() {
                     className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-semibold mx-auto mb-1"
                     style={{ backgroundColor: rightAccent }}
                   >
-                    {rightProfile?.name.charAt(0)}
+                    {getDisplayName(rightProfile).charAt(0)}
                   </div>
                   <p className="text-xs text-gray-500 max-w-[70px] truncate mx-auto">
-                    {rightProfile?.name.split(" ")[0]}
+                    {getDisplayName(rightProfile).split(" ")[0]}
                   </p>
                 </div>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Create Match</h3>
               <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-                {leftProfile?.name}
+                {getDisplayName(leftProfile)}
                 <br />
                 <span className="text-[#D07C84]">&</span>
                 <br />
-                {rightProfile?.name}
+                {getDisplayName(rightProfile)}
               </p>
+              {actionError ? <p className="text-xs text-red-500 mb-3">{actionError}</p> : null}
               <button
-                onClick={handleCreateMatch}
-                className="px-6 py-3 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-colors font-medium"
+                onClick={() => void handleCreateMatch()}
+                disabled={creatingMatch}
+                className="px-6 py-3 bg-[#415192] text-white rounded-lg hover:bg-[#354177] transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Generate Match
+                {creatingMatch ? "Generating..." : "Generate Match"}
               </button>
             </div>
           ) : (
@@ -463,18 +701,20 @@ export function Matchmaking() {
           )}
         </div>
 
-        {/* ── Right: Suggested Profiles ─────────────────────────────── */}
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 pb-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">Suggested Profiles</h2>
-            {suggestedGender && (
+            {leftProfile && (
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search profiles..."
                   value={rightSearch}
-                  onChange={(e) => { setRightSearch(e.target.value); setRightPage(1); }}
+                  onChange={(event) => {
+                    setRightSearch(event.target.value);
+                    setRightPage(1);
+                  }}
                   className={`w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
                     suggestedGender === "Female" ? "focus:ring-[#D07C84]" : "focus:ring-[#415192]"
                   }`}
@@ -485,18 +725,24 @@ export function Matchmaking() {
 
           {!suggestedGender ? (
             <EmptyPanel message="Suggested profiles will appear once a gender is selected on the left" />
+          ) : !leftProfile ? (
+            <EmptyPanel message="Select a requested profile to view suggested prospects" />
           ) : (
             <>
               <div className="px-6 space-y-3 pb-4">
-                {paginatedRight.length === 0 ? (
+                {loadingRight ? (
+                  <p className="text-sm text-gray-400 text-center py-6">Loading profiles...</p>
+                ) : rightError ? (
+                  <p className="text-sm text-red-500 text-center py-6">{rightError}</p>
+                ) : rightProspects.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-6">No profiles found.</p>
                 ) : (
-                  paginatedRight.map((profile) => (
+                  rightProspects.map((profile) => (
                     <div
                       key={profile.id}
-                      onClick={() => setSelectedRight(profile.id)}
+                      onClick={() => setSelectedRight(profile)}
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        selectedRight === profile.id
+                        selectedRight?.id === profile.id
                           ? rightSelectedStyle
                           : "border-gray-200 hover:border-gray-300 bg-white"
                       }`}
@@ -506,13 +752,13 @@ export function Matchmaking() {
                           className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-semibold shrink-0"
                           style={{ backgroundColor: rightAccent }}
                         >
-                          {profile.name.charAt(0)}
+                          {getDisplayName(profile).charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{profile.name}</p>
-                          <p className="text-xs text-gray-500">{profile.age} years</p>
+                          <p className="font-medium text-gray-900 truncate">{getDisplayName(profile)}</p>
+                          <p className="text-xs text-gray-500">{profile.age ?? "-"} years</p>
                         </div>
-                        {selectedRight === profile.id && (
+                        {selectedRight?.id === profile.id && (
                           <div
                             className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                             style={{ backgroundColor: rightAccent }}
@@ -524,11 +770,11 @@ export function Matchmaking() {
                       <div className="space-y-1 text-xs">
                         <div className="flex items-center gap-1.5 text-gray-600">
                           <MapPin className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{profile.location}</span>
+                          <span className="truncate">{getLocation(profile)}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-gray-600">
-                          <Briefcase className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{profile.profession}</span>
+                          <Users className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{formatRole(profile.role)}</span>
                         </div>
                       </div>
                     </div>
@@ -536,11 +782,14 @@ export function Matchmaking() {
                 )}
               </div>
               <TablePagination
-                totalItems={filteredRight.length}
+                totalItems={rightTotal}
                 currentPage={rightPage}
                 pageSize={rightPageSize}
                 onPageChange={setRightPage}
-                onPageSizeChange={(size) => { setRightPageSize(size); setRightPage(1); }}
+                onPageSizeChange={(size) => {
+                  setRightPageSize(size);
+                  setRightPage(1);
+                }}
                 itemLabel="profiles"
               />
             </>
@@ -548,7 +797,6 @@ export function Matchmaking() {
         </div>
       </div>
 
-      {/* Success Modal */}
       {matchSuccess && (
         <MatchSuccessModal
           first={matchSuccess.first}
