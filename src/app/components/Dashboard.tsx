@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, UserCheck, Heart, MessageSquare, Phone, Loader2, X } from "lucide-react";
+import { Users, UserCheck, Heart, MessageSquare, Phone, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
   getDashboardStats,
   listDashboardActivities,
   type DashboardActivity,
+  type DashboardActivitiesResponse,
   type DashboardActivityType,
 } from "../api/dashboard";
 import { ApiError } from "../api/errors";
@@ -17,6 +18,8 @@ const DEFAULT_CHART_DATA = [
   { month: "May", matches: 0 },
   { month: "Jun", matches: 0 },
 ];
+
+const ACTIVITY_PAGE_SIZE = 5;
 
 function getUserLabel(user: DashboardActivity["primary_user"]) {
   if (!user) return "";
@@ -68,7 +71,12 @@ function isDashboardStatsResponse(
 }
 
 function isDashboardActivitiesResponse(value: unknown): value is DashboardActivity[] {
-  return Array.isArray(value);
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    "results" in value &&
+    Array.isArray((value as DashboardActivitiesResponse).results)
+  );
 }
 
 export function Dashboard() {
@@ -81,6 +89,10 @@ export function Dashboard() {
   });
   const [chartData, setChartData] = useState(DEFAULT_CHART_DATA);
   const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
+  const [activityCount, setActivityCount] = useState(0);
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityHasNextPage, setActivityHasNextPage] = useState(false);
+  const [activityHasPreviousPage, setActivityHasPreviousPage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadIndex, setReloadIndex] = useState(0);
@@ -98,9 +110,15 @@ export function Dashboard() {
           statsResponse = await getDashboardStats();
         }
 
-        let activitiesResponse = await listDashboardActivities();
+        let activitiesResponse = await listDashboardActivities({
+          page: activityPage,
+          pageSize: ACTIVITY_PAGE_SIZE,
+        });
         if (activitiesResponse === null) {
-          activitiesResponse = await listDashboardActivities();
+          activitiesResponse = await listDashboardActivities({
+            page: activityPage,
+            pageSize: ACTIVITY_PAGE_SIZE,
+          });
         }
 
         if (cancelled) return;
@@ -135,7 +153,17 @@ export function Dashboard() {
 
         setStats(normalizedStats);
         setChartData(normalizedChartData.length > 0 ? normalizedChartData : DEFAULT_CHART_DATA);
-        setRecentActivity(isDashboardActivitiesResponse(activitiesResponse) ? activitiesResponse : []);
+        if (isDashboardActivitiesResponse(activitiesResponse)) {
+          setRecentActivity(activitiesResponse.results);
+          setActivityCount(typeof activitiesResponse.count === "number" ? activitiesResponse.count : 0);
+          setActivityHasNextPage(Boolean(activitiesResponse.next));
+          setActivityHasPreviousPage(Boolean(activitiesResponse.previous));
+        } else {
+          setRecentActivity([]);
+          setActivityCount(0);
+          setActivityHasNextPage(false);
+          setActivityHasPreviousPage(false);
+        }
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof ApiError ? err.message : "Unable to load dashboard.";
@@ -152,7 +180,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [reloadIndex]);
+  }, [activityPage, reloadIndex]);
 
   const statsCards = useMemo(
     () => [
@@ -169,6 +197,8 @@ export function Dashboard() {
     ],
     [stats],
   );
+
+  const totalActivityPages = Math.max(1, Math.ceil(activityCount / ACTIVITY_PAGE_SIZE));
 
   return (
     <div className="p-8">
@@ -232,7 +262,14 @@ export function Dashboard() {
 
         {/* Recent Activity */}
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm p-6 border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Recent Activity</h2>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+            {!loading && activityCount > 0 ? (
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">
+                Page {activityPage} / {totalActivityPages}
+              </span>
+            ) : null}
+          </div>
           {loading ? (
             <div className="py-8 text-sm text-gray-500 flex items-center gap-3">
               <Loader2 className="w-4 h-4 animate-spin text-[#415192]" />
@@ -258,6 +295,35 @@ export function Dashboard() {
                   </div>
                 );
               })}
+              {activityCount > ACTIVITY_PAGE_SIZE ? (
+                <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+                  <p className="text-xs text-gray-500">
+                    Showing {(activityPage - 1) * ACTIVITY_PAGE_SIZE + 1}
+                    {" - "}
+                    {Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityCount)} of {activityCount}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActivityPage((prev) => Math.max(1, prev - 1))}
+                      disabled={!activityHasPreviousPage || loading}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Prev
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivityPage((prev) => prev + 1)}
+                      disabled={!activityHasNextPage || loading}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
