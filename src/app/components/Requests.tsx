@@ -277,8 +277,8 @@ export function Requests() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900">Requests Management</h1>
-        <p className="text-gray-500 mt-1">View and manage all connection requests</p>
+        <h1 className="text-3xl font-semibold text-gray-900">Private Matchmaking Requests</h1>
+        <p className="text-gray-500 mt-1">View and manage all private matchmaking requests</p>
       </div>
 
       {/* Stats */}
