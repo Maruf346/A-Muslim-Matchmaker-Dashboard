@@ -216,6 +216,15 @@ export function Reports() {
     [analytics],
   );
 
+  const conversionLegendItems = useMemo(() => {
+    const total = conversionData.reduce((sum, item) => sum + item.value, 0);
+
+    return conversionData.map((item) => ({
+      ...item,
+      percent: total > 0 ? Math.round((item.value / total) * 100) : 0,
+    }));
+  }, [conversionData]);
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -294,25 +303,42 @@ export function Reports() {
       <div className="grid grid-cols-3 gap-6">
         <div className="bg-[#F9FAFB] rounded-xl shadow-sm p-6 border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Match Outcomes</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={conversionData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {conversionData.map((entry) => (
-                  <Cell key={`cell-${entry.name}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="h-[220px] min-w-0 w-full md:flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={conversionData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={78}
+                    label={false}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {conversionData.map((entry) => (
+                      <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-full space-y-2 md:max-w-[220px] md:min-w-[200px]">
+              {conversionLegendItems.map((item) => (
+                <div key={item.name} className="flex items-center justify-between rounded-lg bg-white/70 px-3 py-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">{item.percent}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Summary Stats */}
