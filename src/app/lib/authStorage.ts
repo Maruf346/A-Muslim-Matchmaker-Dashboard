@@ -24,6 +24,30 @@ const REFRESH_TOKEN_KEY = "amm_refresh_token";
 const ADMIN_TYPE_KEY = "amm_admin_type";
 const USER_KEY = "amm_user";
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const segments = token.split(".");
+  if (segments.length < 2) return null;
+
+  try {
+    const base64 = segments[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== "number") {
+    return true;
+  }
+
+  const currentUnixTime = Math.floor(Date.now() / 1000);
+  return payload.exp <= currentUnixTime;
+}
+
 export function saveAuthSession(session: AuthSession): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
@@ -68,7 +92,15 @@ export function getAuthSession(): AuthSession | null {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(getAccessToken());
+  const token = getAccessToken();
+  if (!token) return false;
+
+  if (isTokenExpired(token)) {
+    clearAuthSession();
+    return false;
+  }
+
+  return true;
 }
 
 export function isSuperAdmin(): boolean {

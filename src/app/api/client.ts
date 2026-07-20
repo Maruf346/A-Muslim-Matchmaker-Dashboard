@@ -1,4 +1,4 @@
-import { getAccessToken } from "../lib/authStorage";
+import { clearAuthSession, getAccessToken } from "../lib/authStorage";
 import { ApiError, parseApiError } from "./errors";
 
 const API_BASE_URL =
@@ -54,6 +54,14 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   }
 
   if (!response.ok) {
+    if (auth && response.status === 401) {
+      clearAuthSession();
+
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    }
+
     throw new ApiError(parseApiError(data), response.status);
   }
 
