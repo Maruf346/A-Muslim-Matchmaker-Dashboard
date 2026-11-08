@@ -70,3 +70,5 @@ $RECYCLE.BIN/
 /.claude
 .env
 .env.local
+.env.production
+dist/
